@@ -100,18 +100,18 @@ public class MoreActivity extends AppCompatActivity {
 
     private void switchToSearch() {
         showingFavorites = false;
-        tabSearch.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
-        tabSearch.setTextColor(getResources().getColor(R.color.white));
-        tabFavorites.setBackgroundColor(getResources().getColor(R.color.bg_dark));
-        tabFavorites.setTextColor(getResources().getColor(R.color.gray_text));
+        tabSearch.setBackgroundColor(getResources().getColor(R.color.colorPrimary, getTheme()));
+        tabSearch.setTextColor(getResources().getColor(R.color.white, getTheme()));
+        tabFavorites.setBackgroundColor(getResources().getColor(R.color.bg_dark, getTheme()));
+        tabFavorites.setTextColor(getResources().getColor(R.color.gray_text, getTheme()));
     }
 
     private void switchToFavorites() {
         showingFavorites = true;
-        tabFavorites.setBackgroundColor(getResources().getColor(R.color.colorPrimary));
-        tabFavorites.setTextColor(getResources().getColor(R.color.white));
-        tabSearch.setBackgroundColor(getResources().getColor(R.color.bg_dark));
-        tabSearch.setTextColor(getResources().getColor(R.color.gray_text));
+        tabFavorites.setBackgroundColor(getResources().getColor(R.color.colorPrimary, getTheme()));
+        tabFavorites.setTextColor(getResources().getColor(R.color.white, getTheme()));
+        tabSearch.setBackgroundColor(getResources().getColor(R.color.bg_dark, getTheme()));
+        tabSearch.setTextColor(getResources().getColor(R.color.gray_text, getTheme()));
 
         displayList.clear();
         displayList.addAll(favoritesManager.getFavorites());

@@ -117,7 +117,9 @@ public class MusicPlayerManager {
                     mediaPlayer.stop();
                 }
                 mediaPlayer.release();
-            } catch (Exception ignored) {}
+            } catch (Exception e) {
+                android.util.Log.w("MusicPlayer", "Error stopping player", e);
+            }
             mediaPlayer = null;
             isPlaying = false;
         }

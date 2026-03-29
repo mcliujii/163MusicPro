@@ -65,7 +65,9 @@ public class FavoritesManager {
                 song.setUrl(obj.optString("url", null));
                 list.add(song);
             }
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            android.util.Log.w("Favorites", "Error loading favorites", e);
+        }
         return list;
     }
 
@@ -84,7 +86,9 @@ public class FavoritesManager {
                 arr.put(obj);
             }
             prefs.edit().putString(KEY_FAVORITES, arr.toString()).apply();
-        } catch (Exception ignored) {}
+        } catch (Exception e) {
+            android.util.Log.w("Favorites", "Error saving favorites", e);
+        }
     }
 
     public void setCloudSync(boolean enabled) {
