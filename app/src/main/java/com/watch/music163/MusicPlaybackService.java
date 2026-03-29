@@ -108,7 +108,7 @@ public class MusicPlaybackService extends Service {
         PowerManager pm = (PowerManager) getSystemService(POWER_SERVICE);
         if (pm != null) {
             wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "music163:playback");
-            wakeLock.acquire();
+            wakeLock.acquire(12 * 60 * 60 * 1000L); // 12 hours max to prevent indefinite hold
         }
     }
 
