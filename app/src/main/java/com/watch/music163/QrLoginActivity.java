@@ -58,7 +58,7 @@ public class QrLoginActivity extends AppCompatActivity {
                 MusicApiHelper.loginQrCreate(key, new MusicApiHelper.QrCreateCallback() {
                     @Override
                     public void onResult(String qrUrl) {
-                        Bitmap qrBitmap = generateQrBitmap(qrUrl, 400);
+                        Bitmap qrBitmap = generateQrBitmap(qrUrl, 300);
                         if (qrBitmap != null) {
                             ivQrCode.setImageBitmap(qrBitmap);
                             tvStatus.setText("请使用网易云音乐App扫码登录");

@@ -82,6 +82,17 @@ public class FavoritesManager {
         } catch (Exception e) {
             Log.w(TAG, "Error loading favorites", e);
         }
+
+        // If SharedPreferences is empty, try to restore from external file backup
+        if (list.isEmpty()) {
+            List<Song> external = loadFromExternalFile();
+            if (!external.isEmpty()) {
+                Log.d(TAG, "Restoring " + external.size() + " favorites from external file");
+                saveFavorites(external);
+                return external;
+            }
+        }
+
         return list;
     }
 

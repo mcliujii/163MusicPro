@@ -35,6 +35,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private AudioManager audioManager;
     private final Handler seekHandler = new Handler();
     private boolean isUserSeeking = false;
+    private boolean serviceStarted = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -55,6 +56,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         TextView btnMore = findViewById(R.id.btn_more);
 
         playerManager = MusicPlayerManager.getInstance();
+        playerManager.setContext(this);
         favoritesManager = new FavoritesManager(this);
         audioManager = (AudioManager) getSystemService(Context.AUDIO_SERVICE);
 
@@ -134,6 +136,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         playerManager.setCallback(this);
         updateUI();
 
+        // Start foreground service to keep alive
+        startPlaybackService("163音乐", "等待播放");
+
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
     }
@@ -202,6 +207,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvArtist.setText(song.getArtist());
         btnFavorite.setText(
                 favoritesManager.isFavorite(song.getId()) ? HEART_FILLED : HEART_OUTLINE);
+        startPlaybackService(song.getName(), song.getArtist());
     }
 
     @Override
@@ -209,6 +215,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPlay.setText(isPlaying ? "\u23F8" : "\u25B6");
         if (isPlaying) {
             startSeekBarUpdate();
+            if (!serviceStarted) {
+                Song song = playerManager.getCurrentSong();
+                String name = song != null ? song.getName() : "";
+                String artist = song != null ? song.getArtist() : "";
+                startPlaybackService(name, artist);
+            }
         } else {
             stopSeekBarUpdate();
         }
@@ -243,6 +255,18 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void stopSeekBarUpdate() {
         seekHandler.removeCallbacks(seekBarUpdateRunnable);
+    }
+
+    private void startPlaybackService(String songName, String artist) {
+        Intent serviceIntent = new Intent(this, MusicPlaybackService.class);
+        serviceIntent.putExtra("song_name", songName);
+        serviceIntent.putExtra("artist", artist);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            startForegroundService(serviceIntent);
+        } else {
+            startService(serviceIntent);
+        }
+        serviceStarted = true;
     }
 
     private String formatTime(int ms) {

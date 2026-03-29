@@ -36,6 +36,10 @@ public class MusicApiHelper {
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
             "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36 Edg/124.0.0.0";
 
+    // Mobile User-Agent for SMS login to avoid "环境不安全" error
+    private static final String MOBILE_USER_AGENT =
+            "NeteaseMusic/9.0.90 (Android 13; Pixel 6)";
+
     // Device/version info to prevent "version too old" errors
     private static final String OS_VER = "16.2";
     private static final String APP_VER = "9.0.90";
@@ -350,6 +354,7 @@ public class MusicApiHelper {
     /**
      * Send SMS verification code to phone number
      * (same as NeteaseCloudMusicApiBackup module/captcha_sent.js)
+     * Uses os=android cookie to avoid "环境不安全" error.
      */
     public static void sendSmsCode(String phone, String ctcode, SmsCallback callback) {
         executor.execute(() -> {
@@ -357,8 +362,9 @@ public class MusicApiHelper {
                 JSONObject data = new JSONObject();
                 data.put("ctcode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("cellphone", phone);
+                data.put("checkToken", "");
 
-                String response = weapiPost("/api/sms/captcha/sent", data.toString(), null);
+                String response = weapiPostMobile("/api/sms/captcha/sent", data.toString(), null);
                 JSONObject json = new JSONObject(response);
                 int code = json.optInt("code", -1);
                 if (code == 200) {
@@ -376,6 +382,7 @@ public class MusicApiHelper {
     /**
      * Login with phone number and SMS captcha
      * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js)
+     * Uses os=android cookie to avoid "环境不安全" error.
      */
     public static void loginByCellphone(String phone, String captcha, String ctcode,
                                          LoginCallback callback) {
@@ -388,6 +395,7 @@ public class MusicApiHelper {
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("captcha", captcha);
                 data.put("rememberLogin", "true");
+                data.put("checkToken", "");
 
                 String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
                 String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
@@ -397,10 +405,10 @@ public class MusicApiHelper {
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
-                conn.setRequestProperty("User-Agent", USER_AGENT);
+                conn.setRequestProperty("User-Agent", MOBILE_USER_AGENT);
                 conn.setRequestProperty("Referer", DOMAIN);
                 conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-                conn.setRequestProperty("Cookie", buildAnonymousCookie(""));
+                conn.setRequestProperty("Cookie", buildMobileCookie(""));
                 conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 conn.setReadTimeout(READ_TIMEOUT_MS);
                 conn.setDoOutput(true);
@@ -498,6 +506,79 @@ public class MusicApiHelper {
     }
 
     // ==================== Utility ====================
+
+    /**
+     * Send a weapi-encrypted POST request using mobile device identity.
+     * Used for SMS login operations to avoid "环境不安全" error.
+     */
+    private static String weapiPostMobile(String apiPath, String jsonData, String cookie) throws Exception {
+        String[] encrypted = NeteaseApiCrypto.weapi(jsonData);
+
+        String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
+                + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
+
+        String weapiPath = apiPath.replaceFirst("^/api/", "/weapi/");
+        String urlStr = DOMAIN + weapiPath;
+
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("User-Agent", MOBILE_USER_AGENT);
+        conn.setRequestProperty("Referer", DOMAIN);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Cookie", buildMobileCookie(cookie));
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setDoOutput(true);
+
+        try {
+            OutputStream os = conn.getOutputStream();
+            os.write(postBody.getBytes("UTF-8"));
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+            BufferedReader reader;
+            if (responseCode >= 200 && responseCode < 400) {
+                reader = new BufferedReader(
+                        new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            } else {
+                reader = new BufferedReader(
+                        new InputStreamReader(conn.getErrorStream(), "UTF-8"));
+            }
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            return sb.toString();
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    /**
+     * Build a cookie string with Android mobile device identity.
+     * Used for SMS login to avoid "环境不安全" error.
+     */
+    private static String buildMobileCookie(String existingCookie) {
+        StringBuilder sb = new StringBuilder();
+        if (existingCookie != null && !existingCookie.isEmpty()) {
+            sb.append(existingCookie);
+            if (!existingCookie.endsWith("; ")) {
+                sb.append("; ");
+            }
+        }
+        sb.append("__remember_me=true; ");
+        sb.append("ntes_kaola_ad=1; ");
+        sb.append("WEVNSM=1.0.0; ");
+        sb.append("osver=13; ");
+        sb.append("deviceId=").append(deviceId).append("; ");
+        sb.append("os=android; ");
+        sb.append("channel=").append(CHANNEL).append("; ");
+        sb.append("appver=").append(APP_VER);
+        return sb.toString();
+    }
 
     /**
      * Build a cookie string with proper version/device info.

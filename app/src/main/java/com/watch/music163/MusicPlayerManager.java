@@ -1,9 +1,11 @@
 package com.watch.music163;
 
+import android.content.Context;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +35,7 @@ public class MusicPlayerManager {
     private PlayMode playMode = PlayMode.LIST_LOOP;
     private final Random random = new Random();
     private long currentlyPlayingSongId = -1;
+    private Context appContext;
 
     private MusicPlayerManager() {}
 
@@ -41,6 +44,10 @@ public class MusicPlayerManager {
             instance = new MusicPlayerManager();
         }
         return instance;
+    }
+
+    public void setContext(Context context) {
+        this.appContext = context.getApplicationContext();
     }
 
     public void setCallback(PlayerCallback callback) {
@@ -84,6 +91,9 @@ public class MusicPlayerManager {
         stop();
         mediaPlayer = new MediaPlayer();
         try {
+            if (appContext != null) {
+                mediaPlayer.setWakeMode(appContext, PowerManager.PARTIAL_WAKE_LOCK);
+            }
             mediaPlayer.setAudioAttributes(
                     new AudioAttributes.Builder()
                             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
@@ -110,7 +120,7 @@ public class MusicPlayerManager {
                             new MusicApiHelper.UrlCallback() {
                                 @Override
                                 public void onResult(String retryUrl) {
-                                    if (retryUrl != null && !retryUrl.equals(url)) {
+                                    if (retryUrl != null) {
                                         song.setUrl(retryUrl);
                                         play(retryUrl);
                                     } else if (callback != null) {
@@ -209,6 +219,8 @@ public class MusicPlayerManager {
      * Behavior depends on play mode.
      */
     private void onSongCompleted() {
+        isPlaying = false;
+        notifyPlayStateChanged(false);
         if (playlist.isEmpty()) return;
         switch (playMode) {
             case SINGLE_REPEAT:
@@ -270,36 +282,30 @@ public class MusicPlayerManager {
         Song song = getCurrentSong();
         if (song == null) return;
 
-        // Only restart playback if the song is actually different from what's playing
-        if (currentlyPlayingSongId == song.getId() && isPlaying) {
-            // Same song is already playing, just notify UI without restarting
-            notifySongChanged(song);
-            return;
-        }
-
         notifySongChanged(song);
-        if (song.getUrl() != null && !song.getUrl().isEmpty()) {
-            currentlyPlayingSongId = song.getId();
-            play(song.getUrl());
-        } else {
-            // Need to fetch URL first
-            String cookie = getCookie();
-            MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
-                @Override
-                public void onResult(String url) {
-                    song.setUrl(url);
-                    currentlyPlayingSongId = song.getId();
-                    play(url);
-                }
 
-                @Override
-                public void onError(String message) {
-                    if (callback != null) {
-                        callback.onError("无法获取歌曲链接: " + message);
-                    }
+        // Always fetch a fresh URL to avoid expired URL issues.
+        // NetEase song URLs are time-limited, so cached URLs may not work.
+        String cookie = getCookie();
+        MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
+            @Override
+            public void onResult(String url) {
+                song.setUrl(url);
+                currentlyPlayingSongId = song.getId();
+                play(url);
+            }
+
+            @Override
+            public void onError(String message) {
+                // Fallback: try cached URL if available
+                if (song.getUrl() != null && !song.getUrl().isEmpty()) {
+                    currentlyPlayingSongId = song.getId();
+                    play(song.getUrl());
+                } else if (callback != null) {
+                    mainHandler.post(() -> callback.onError("无法获取歌曲链接: " + message));
                 }
-            });
-        }
+            }
+        });
     }
 
     private String cookieValue = "";
