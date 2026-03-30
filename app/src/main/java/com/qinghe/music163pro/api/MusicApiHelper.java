@@ -555,7 +555,9 @@ public class MusicApiHelper {
                     return;
                 }
 
-                // Limit to 200 songs to avoid too large requests
+                // Limit to 200 songs per request to avoid oversized payloads
+                // (NetEase /api/v3/song/detail supports up to ~1000 IDs per request,
+                // but 200 is a safe limit for watch devices with limited memory)
                 int limit = Math.min(idsArray.length(), 200);
                 JSONArray songIds = new JSONArray();
                 for (int i = 0; i < limit; i++) {
