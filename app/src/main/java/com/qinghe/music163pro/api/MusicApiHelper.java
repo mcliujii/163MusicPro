@@ -110,6 +110,16 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface CloudFavoritesCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
+    public interface LikeCallback {
+        void onResult(boolean success);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -510,6 +520,134 @@ public class MusicApiHelper {
             }
         }
         return "";
+    }
+
+    // ==================== Cloud Favorites ====================
+
+    /**
+     * Get the user's "liked songs" playlist from the cloud.
+     * Step 1: Get user's liked song IDs via /api/song/like/get
+     * Step 2: Get song details via /api/v3/song/detail
+     * (same as NeteaseCloudMusicApiBackup module/likelist.js and song_detail.js)
+     */
+    public static void getCloudFavorites(String cookie, CloudFavoritesCallback callback) {
+        executor.execute(() -> {
+            try {
+                // Step 1: Get liked song IDs
+                long uid = extractUidFromCookie(cookie);
+                if (uid <= 0) {
+                    mainHandler.post(() -> callback.onError("请先登录"));
+                    return;
+                }
+
+                JSONObject likeData = new JSONObject();
+                likeData.put("uid", uid);
+
+                String csrfToken = extractCsrfToken(cookie);
+                likeData.put("csrf_token", csrfToken);
+
+                String likeResponse = weapiPost("/api/song/like/get", likeData.toString(), cookie);
+                JSONObject likeJson = new JSONObject(likeResponse);
+
+                JSONArray idsArray = likeJson.optJSONArray("ids");
+                if (idsArray == null || idsArray.length() == 0) {
+                    mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                    return;
+                }
+
+                // Limit to 200 songs to avoid too large requests
+                int limit = Math.min(idsArray.length(), 200);
+                JSONArray songIds = new JSONArray();
+                for (int i = 0; i < limit; i++) {
+                    JSONObject idObj = new JSONObject();
+                    idObj.put("id", idsArray.getLong(i));
+                    songIds.put(idObj);
+                }
+
+                // Step 2: Get song details
+                JSONObject detailData = new JSONObject();
+                detailData.put("c", songIds.toString());
+                detailData.put("csrf_token", csrfToken);
+
+                String detailResponse = weapiPost("/api/v3/song/detail", detailData.toString(), cookie);
+                JSONObject detailJson = new JSONObject(detailResponse);
+                JSONArray songsArray = detailJson.optJSONArray("songs");
+
+                List<Song> songs = new ArrayList<>();
+                if (songsArray != null) {
+                    for (int i = 0; i < songsArray.length(); i++) {
+                        JSONObject s = songsArray.getJSONObject(i);
+                        long id = s.getLong("id");
+                        String name = s.getString("name");
+                        String artist = "";
+                        JSONArray ar = s.optJSONArray("ar");
+                        if (ar != null && ar.length() > 0) {
+                            artist = ar.getJSONObject(0).optString("name", "");
+                        }
+                        String album = "";
+                        JSONObject al = s.optJSONObject("al");
+                        if (al != null) {
+                            album = al.optString("name", "");
+                        }
+                        songs.add(new Song(id, name, artist, album));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                Log.w(TAG, "Cloud favorites error", e);
+                mainHandler.post(() -> callback.onError("获取云端收藏失败: " + e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Like or unlike a song on the cloud.
+     * (same as NeteaseCloudMusicApiBackup module/like.js)
+     */
+    public static void likeTrack(long trackId, boolean like, String cookie, LikeCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("trackId", trackId);
+                data.put("like", like);
+                data.put("alg", "itembased");
+                data.put("time", 3);
+
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/radio/like", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                Log.w(TAG, "Like track error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Extract user ID from cookie string (MUSIC_U contains user session).
+     * Uses /api/w/nuser/account/get to get the user's account info.
+     */
+    private static long extractUidFromCookie(String cookie) {
+        if (cookie == null || cookie.isEmpty()) return -1;
+        try {
+            JSONObject data = new JSONObject();
+            String csrfToken = extractCsrfToken(cookie);
+            data.put("csrf_token", csrfToken);
+
+            String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
+            JSONObject json = new JSONObject(response);
+            JSONObject account = json.optJSONObject("account");
+            if (account != null) {
+                return account.optLong("id", -1);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error extracting UID", e);
+        }
+        return -1;
     }
 
     // ==================== weapi POST ====================

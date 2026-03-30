@@ -33,6 +33,7 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.manager.RingtoneManagerHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.service.MusicPlaybackService;
@@ -418,12 +419,45 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void onFuncFavorite(Song song) {
-        if (favoritesManager.isFavorite(song.getId())) {
-            favoritesManager.removeFavorite(song);
-            Toast.makeText(this, "已取消收藏", Toast.LENGTH_SHORT).show();
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
+
+        if (isCloud) {
+            // Cloud mode: use API to like/unlike
+            boolean isCurrentlyLiked = favoritesManager.isFavorite(song.getId());
+            String cookie = playerManager.getCookie();
+            if (cookie == null || cookie.isEmpty()) {
+                Toast.makeText(this, "请先登录以使用云端收藏", Toast.LENGTH_SHORT).show();
+                dismissOverlay();
+                return;
+            }
+            MusicApiHelper.likeTrack(song.getId(), !isCurrentlyLiked, cookie,
+                    new MusicApiHelper.LikeCallback() {
+                @Override
+                public void onResult(boolean success) {
+                    if (success) {
+                        Toast.makeText(MainActivity.this,
+                                isCurrentlyLiked ? "已取消云端收藏" : "已云端收藏",
+                                Toast.LENGTH_SHORT).show();
+                    } else {
+                        Toast.makeText(MainActivity.this, "操作失败", Toast.LENGTH_SHORT).show();
+                    }
+                }
+                @Override
+                public void onError(String message) {
+                    Toast.makeText(MainActivity.this, "操作失败: " + message,
+                            Toast.LENGTH_SHORT).show();
+                }
+            });
         } else {
-            favoritesManager.addFavorite(song);
-            Toast.makeText(this, "已收藏", Toast.LENGTH_SHORT).show();
+            // Local mode
+            if (favoritesManager.isFavorite(song.getId())) {
+                favoritesManager.removeFavorite(song);
+                Toast.makeText(this, "已取消收藏", Toast.LENGTH_SHORT).show();
+            } else {
+                favoritesManager.addFavorite(song);
+                Toast.makeText(this, "已收藏", Toast.LENGTH_SHORT).show();
+            }
         }
         dismissOverlay();
     }
@@ -547,6 +581,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             if (newUri != null) {
                 RingtoneManager.setActualDefaultRingtoneUri(this,
                         RingtoneManager.TYPE_RINGTONE, newUri);
+                // Save ringtone info for management
+                RingtoneManagerHelper ringtoneHelper = new RingtoneManagerHelper(this);
+                ringtoneHelper.addRingtone(title, file.getAbsolutePath());
                 Toast.makeText(this, "已设为铃声", Toast.LENGTH_SHORT).show();
             } else {
                 Toast.makeText(this, "设置铃声失败", Toast.LENGTH_SHORT).show();

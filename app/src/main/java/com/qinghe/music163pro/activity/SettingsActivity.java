@@ -19,6 +19,7 @@ public class SettingsActivity extends AppCompatActivity {
 
     private EditText etCookie;
     private TextView btnKeepScreenOn;
+    private TextView btnFavMode;
     private SharedPreferences prefs;
     private MusicPlayerManager playerManager;
 
@@ -40,11 +41,13 @@ public class SettingsActivity extends AppCompatActivity {
         TextView btnQrLogin = findViewById(R.id.btn_qr_login);
         TextView btnSmsLogin = findViewById(R.id.btn_sms_login);
         btnKeepScreenOn = findViewById(R.id.btn_keep_screen_on);
+        btnFavMode = findViewById(R.id.btn_fav_mode);
 
         // Load saved values
         etCookie.setText(prefs.getString("cookie", ""));
 
         updateKeepScreenOnText();
+        updateFavModeText();
 
         btnSave.setOnClickListener(v -> {
             String cookie = etCookie.getText().toString().trim();
@@ -66,6 +69,7 @@ public class SettingsActivity extends AppCompatActivity {
         );
 
         btnKeepScreenOn.setOnClickListener(v -> toggleKeepScreenOn());
+        btnFavMode.setOnClickListener(v -> toggleFavMode());
     }
 
     @Override
@@ -74,6 +78,7 @@ public class SettingsActivity extends AppCompatActivity {
         // Refresh cookie field in case QR/SMS login updated it
         etCookie.setText(prefs.getString("cookie", ""));
         updateKeepScreenOnText();
+        updateFavModeText();
     }
 
     private void toggleKeepScreenOn() {
@@ -91,5 +96,19 @@ public class SettingsActivity extends AppCompatActivity {
     private void updateKeepScreenOnText() {
         boolean on = prefs.getBoolean("keep_screen_on", false);
         btnKeepScreenOn.setText(on ? R.string.keep_screen_on_on : R.string.keep_screen_on_off);
+    }
+
+    private void toggleFavMode() {
+        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
+        boolean next = !isCloud;
+        prefs.edit().putBoolean("fav_mode_cloud", next).apply();
+        updateFavModeText();
+        String mode = next ? "云端" : "本地";
+        Toast.makeText(this, "收藏模式已切换为: " + mode, Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateFavModeText() {
+        boolean isCloud = prefs.getBoolean("fav_mode_cloud", false);
+        btnFavMode.setText(isCloud ? R.string.fav_mode_cloud : R.string.fav_mode_local);
     }
 }

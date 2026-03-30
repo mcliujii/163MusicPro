@@ -278,4 +278,42 @@ public class DownloadManager {
     public static boolean isDownloaded(Song song) {
         return getDownloadedMp3Path(song) != null;
     }
+
+    /**
+     * Delete a downloaded song (removes the entire song directory or legacy file).
+     * @return true if deletion was successful
+     */
+    public static boolean deleteDownload(Song song) {
+        // Try new subfolder format first
+        String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
+        String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
+        String folderName = safeName + " - " + safeArtist;
+        File dir = new File(Environment.getExternalStorageDirectory(), DOWNLOAD_DIR);
+        File songDir = new File(dir, folderName);
+        if (songDir.exists() && songDir.isDirectory()) {
+            return deleteDir(songDir);
+        }
+        // Try legacy flat file
+        String fileName = safeName + " - " + safeArtist + ".mp3";
+        File legacy = new File(dir, fileName);
+        if (legacy.exists()) {
+            return legacy.delete();
+        }
+        return false;
+    }
+
+    /**
+     * Recursively delete a directory and its contents.
+     */
+    private static boolean deleteDir(File dir) {
+        if (dir.isDirectory()) {
+            File[] children = dir.listFiles();
+            if (children != null) {
+                for (File child : children) {
+                    deleteDir(child);
+                }
+            }
+        }
+        return dir.delete();
+    }
 }

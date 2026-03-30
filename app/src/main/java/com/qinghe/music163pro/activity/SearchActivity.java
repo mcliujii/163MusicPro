@@ -3,11 +3,14 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.EditText;
+import android.widget.FrameLayout;
+import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -26,6 +29,7 @@ import java.util.List;
 
 /**
  * Search activity - search songs and play from results.
+ * Long press search history to delete with confirmation dialog.
  */
 public class SearchActivity extends AppCompatActivity {
 
@@ -92,10 +96,13 @@ public class SearchActivity extends AppCompatActivity {
         });
 
         lvHistory.setOnItemLongClickListener((parent, view, position, id) -> {
-            historyList.remove(position);
-            saveSearchHistory();
-            historyAdapter.notifyDataSetChanged();
-            updateHistoryVisibility();
+            String keyword = historyList.get(position);
+            showConfirmDialog("确认删除", "确定删除搜索记录「" + keyword + "」？", () -> {
+                historyList.remove(position);
+                saveSearchHistory();
+                historyAdapter.notifyDataSetChanged();
+                updateHistoryVisibility();
+            });
             return true;
         });
 
@@ -179,5 +186,98 @@ public class SearchActivity extends AppCompatActivity {
             lvHistory.setVisibility(View.GONE);
             lvSongs.setVisibility(View.VISIBLE);
         }
+    }
+
+    /**
+     * Show a confirmation dialog with consistent dark theme style.
+     */
+    private void showConfirmDialog(String title, String message, Runnable onConfirm) {
+        FrameLayout rootView = findViewById(android.R.id.content);
+
+        FrameLayout overlay = new FrameLayout(this);
+        overlay.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlay.setBackgroundColor(0xCC333333);
+
+        LinearLayout dialog = new LinearLayout(this);
+        dialog.setOrientation(LinearLayout.VERTICAL);
+        dialog.setBackgroundColor(0xFF424242);
+        dialog.setPadding(dp(20), dp(16), dp(20), dp(16));
+        FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        dlgParams.gravity = Gravity.CENTER;
+        dlgParams.leftMargin = dp(20);
+        dlgParams.rightMargin = dp(20);
+        dialog.setLayoutParams(dlgParams);
+
+        // Title
+        TextView tvTitle = new TextView(this);
+        tvTitle.setText(title);
+        tvTitle.setTextColor(0xFFFFFFFF);
+        tvTitle.setTextSize(15);
+        tvTitle.setGravity(Gravity.CENTER);
+        tvTitle.setPadding(0, 0, 0, dp(8));
+        dialog.addView(tvTitle);
+
+        // Message
+        TextView tvMessage = new TextView(this);
+        tvMessage.setText(message);
+        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextSize(13);
+        tvMessage.setGravity(Gravity.CENTER);
+        tvMessage.setPadding(0, 0, 0, dp(16));
+        dialog.addView(tvMessage);
+
+        // Buttons row
+        LinearLayout btnRow = new LinearLayout(this);
+        btnRow.setOrientation(LinearLayout.HORIZONTAL);
+        btnRow.setGravity(Gravity.CENTER);
+        dialog.addView(btnRow);
+
+        // Cancel button
+        TextView btnCancel = new TextView(this);
+        btnCancel.setText("取消");
+        btnCancel.setTextColor(0xFFFFFFFF);
+        btnCancel.setTextSize(14);
+        btnCancel.setGravity(Gravity.CENTER);
+        btnCancel.setPadding(dp(16), dp(8), dp(16), dp(8));
+        btnCancel.setBackgroundColor(0xFF616161);
+        LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        cancelParams.rightMargin = dp(4);
+        btnCancel.setLayoutParams(cancelParams);
+        btnCancel.setClickable(true);
+        btnCancel.setFocusable(true);
+        btnCancel.setOnClickListener(v -> rootView.removeView(overlay));
+        btnRow.addView(btnCancel);
+
+        // Confirm button
+        TextView btnConfirm = new TextView(this);
+        btnConfirm.setText("确定");
+        btnConfirm.setTextColor(0xFFFFFFFF);
+        btnConfirm.setTextSize(14);
+        btnConfirm.setGravity(Gravity.CENTER);
+        btnConfirm.setPadding(dp(16), dp(8), dp(16), dp(8));
+        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        confirmParams.leftMargin = dp(4);
+        btnConfirm.setLayoutParams(confirmParams);
+        btnConfirm.setClickable(true);
+        btnConfirm.setFocusable(true);
+        btnConfirm.setOnClickListener(v -> {
+            rootView.removeView(overlay);
+            onConfirm.run();
+        });
+        btnRow.addView(btnConfirm);
+
+        overlay.addView(dialog);
+        overlay.setOnClickListener(v -> rootView.removeView(overlay));
+        dialog.setOnClickListener(v -> { /* consume click */ });
+        rootView.addView(overlay);
+    }
+
+    private int dp(int dp) {
+        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
     }
 }
