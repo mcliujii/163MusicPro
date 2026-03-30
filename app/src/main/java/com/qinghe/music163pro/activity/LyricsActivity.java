@@ -138,17 +138,16 @@ public class LyricsActivity extends AppCompatActivity {
             );
             if (!lrcFile.exists()) return null;
 
-            FileInputStream fis = new FileInputStream(lrcFile);
-            InputStreamReader reader = new InputStreamReader(fis, "UTF-8");
-            StringBuilder sb = new StringBuilder();
-            char[] buf = new char[1024];
-            int len;
-            while ((len = reader.read(buf)) != -1) {
-                sb.append(buf, 0, len);
+            try (FileInputStream fis = new FileInputStream(lrcFile);
+                 InputStreamReader reader = new InputStreamReader(fis, "UTF-8")) {
+                StringBuilder sb = new StringBuilder();
+                char[] buf = new char[1024];
+                int len;
+                while ((len = reader.read(buf)) != -1) {
+                    sb.append(buf, 0, len);
+                }
+                return sb.toString();
             }
-            reader.close();
-            fis.close();
-            return sb.toString();
         } catch (Exception e) {
             return null;
         }
@@ -165,10 +164,11 @@ public class LyricsActivity extends AppCompatActivity {
                 String msStr = matcher.group(3);
                 int ms = 0;
                 if (msStr != null && !msStr.isEmpty()) {
-                    // Normalize to milliseconds
-                    if (msStr.length() == 1) ms = Integer.parseInt(msStr) * 100;
-                    else if (msStr.length() == 2) ms = Integer.parseInt(msStr) * 10;
-                    else ms = Integer.parseInt(msStr);
+                    // Normalize to milliseconds (handle 1, 2, or 3 digit formats)
+                    int parsed = Integer.parseInt(msStr.substring(0, Math.min(msStr.length(), 3)));
+                    if (msStr.length() == 1) ms = parsed * 100;
+                    else if (msStr.length() == 2) ms = parsed * 10;
+                    else ms = parsed;
                 }
                 long timeMs = (long) min * 60 * 1000 + (long) sec * 1000 + ms;
                 String text = matcher.group(4).trim();

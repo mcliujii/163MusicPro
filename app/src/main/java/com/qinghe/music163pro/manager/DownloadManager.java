@@ -146,12 +146,11 @@ public class DownloadManager {
             String lrcText = MusicApiHelper.fetchLyricsSync(song.getId(), null);
             if (lrcText != null && !lrcText.isEmpty()) {
                 File lrcFile = new File(songDir, LYRICS_FILE);
-                FileOutputStream fos = new FileOutputStream(lrcFile);
-                OutputStreamWriter writer = new OutputStreamWriter(fos, "UTF-8");
-                writer.write(lrcText);
-                writer.flush();
-                writer.close();
-                fos.close();
+                try (FileOutputStream fos = new FileOutputStream(lrcFile);
+                     OutputStreamWriter writer = new OutputStreamWriter(fos, "UTF-8")) {
+                    writer.write(lrcText);
+                    writer.flush();
+                }
             }
         } catch (Exception e) {
             Log.w(TAG, "Error downloading lyrics", e);
