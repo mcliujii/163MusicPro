@@ -300,11 +300,13 @@ public class MusicPlayerManager {
         notifySongChanged(song);
         savePlaybackState();
 
-        // For local files (downloaded songs with id=0 and a local file path),
+        // For local files (downloaded songs with a local file path),
         // play directly without fetching URL from the API.
-        if (song.getId() == 0 && song.getUrl() != null && !song.getUrl().isEmpty()) {
-            currentlyPlayingSongId = 0;
-            play(song.getUrl());
+        // This covers both legacy (id=0) and new format (real id with local path).
+        String url = song.getUrl();
+        if (url != null && !url.isEmpty() && url.startsWith("/")) {
+            currentlyPlayingSongId = song.getId();
+            play(url);
             return;
         }
 
@@ -313,10 +315,10 @@ public class MusicPlayerManager {
         String cookie = getCookie();
         MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
             @Override
-            public void onResult(String url) {
-                song.setUrl(url);
+            public void onResult(String freshUrl) {
+                song.setUrl(freshUrl);
                 currentlyPlayingSongId = song.getId();
-                play(url);
+                play(freshUrl);
             }
 
             @Override
@@ -364,13 +366,22 @@ public class MusicPlayerManager {
      * @param minutes number of minutes until auto-stop
      */
     public void startSleepTimer(int minutes) {
+        startSleepTimerSeconds(minutes * 60);
+    }
+
+    /**
+     * Start sleep timer. Stops playback after the specified number of seconds.
+     * @param seconds number of seconds until auto-stop
+     */
+    public void startSleepTimerSeconds(int seconds) {
         cancelSleepTimer();
-        sleepTimerEndMs = System.currentTimeMillis() + (long) minutes * 60 * 1000;
+        long delayMs = (long) seconds * 1000;
+        sleepTimerEndMs = System.currentTimeMillis() + delayMs;
         sleepTimerRunnable = () -> {
             pause();
             sleepTimerEndMs = 0;
         };
-        mainHandler.postDelayed(sleepTimerRunnable, (long) minutes * 60 * 1000);
+        mainHandler.postDelayed(sleepTimerRunnable, delayMs);
     }
 
     /**

@@ -13,8 +13,10 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
+import android.text.InputType;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -58,6 +60,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     // Functions overlay
     private FrameLayout overlayContainer;
+    private Handler overlayTimerHandler;
+    private Runnable overlayTimerRunnable;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -277,18 +281,33 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.addView(createFuncItem("🔔", "设为铃声",
                 v -> onFuncSetRingtone(song)));
 
-        // Sleep timer - show remaining time if active
+        // Sleep timer - show remaining time if active, with live updates
+        LinearLayout timerItem = createFuncItem("⏱",
+                playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
+                v -> onFuncSleepTimer());
+        row2.addView(timerItem);
+
+        // Find the label view in timerItem (second child) for live updates
+        final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
         if (playerManager.isSleepTimerActive()) {
-            long remainMs = playerManager.getSleepTimerRemainingMs();
-            int totalSec = (int) (remainMs / 1000);
-            int min = totalSec / 60;
-            int sec = totalSec % 60;
-            String timerLabel = String.format("定时 %d:%02d", min, sec);
-            row2.addView(createFuncItem("⏱", timerLabel,
-                    v -> onFuncSleepTimer()));
-        } else {
-            row2.addView(createFuncItem("⏱", "定时关闭",
-                    v -> onFuncSleepTimer()));
+            overlayTimerHandler = new Handler();
+            overlayTimerRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (overlayContainer == null) return;
+                    long remainMs = playerManager.getSleepTimerRemainingMs();
+                    if (remainMs > 0) {
+                        int totalSec = (int) (remainMs / 1000);
+                        int min = totalSec / 60;
+                        int sec = totalSec % 60;
+                        timerLabelView.setText(String.format("定时 %d:%02d", min, sec));
+                        overlayTimerHandler.postDelayed(this, 1000);
+                    } else {
+                        timerLabelView.setText("定时关闭");
+                    }
+                }
+            };
+            overlayTimerRunnable.run();
         }
         contentLayout.addView(row2);
 
@@ -326,6 +345,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private void dismissOverlay() {
+        if (overlayTimerHandler != null) {
+            overlayTimerHandler.removeCallbacksAndMessages(null);
+            overlayTimerHandler = null;
+            overlayTimerRunnable = null;
+        }
         if (overlayContainer != null) {
             FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
             rootView.removeView(overlayContainer);
@@ -368,13 +392,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void onFuncSetRingtone(Song song) {
         dismissOverlay();
         // Check if song is downloaded first
-        String safeName = song.getName().replaceAll("[\\\\/:*?\"<>|]", "_");
-        String safeArtist = song.getArtist().replaceAll("[\\\\/:*?\"<>|]", "_");
-        String fileName = safeName + " - " + safeArtist + ".mp3";
-        File downloadDir = new File(DownloadManager.getDownloadDirPath());
-        File file = new File(downloadDir, fileName);
+        String mp3Path = DownloadManager.getDownloadedMp3Path(song);
 
-        if (!file.exists()) {
+        if (mp3Path == null) {
             // Download first, then set as ringtone
             Toast.makeText(this, "正在下载歌曲...", Toast.LENGTH_SHORT).show();
             String cookie = playerManager.getCookie();
@@ -390,7 +410,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 }
             });
         } else {
-            setRingtoneFromFile(file, song.getName());
+            setRingtoneFromFile(new File(mp3Path), song.getName());
         }
     }
 
@@ -479,7 +499,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         title.setPadding(0, 0, 0, dp(12));
         contentLayout.addView(title);
 
-        // Timer options
+        // Preset timer options
         int[] minutes = {5, 10, 20, 30};
         for (int min : minutes) {
             TextView btn = new TextView(this);
@@ -503,6 +523,68 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             });
             contentLayout.addView(btn);
         }
+
+        // Custom seconds label
+        TextView customLabel = new TextView(this);
+        customLabel.setText("自定义（秒）");
+        customLabel.setTextColor(0xFFCCCCCC);
+        customLabel.setTextSize(13);
+        customLabel.setGravity(Gravity.CENTER);
+        customLabel.setPadding(0, dp(12), 0, dp(4));
+        contentLayout.addView(customLabel);
+
+        // Custom seconds input row
+        LinearLayout customRow = new LinearLayout(this);
+        customRow.setOrientation(LinearLayout.HORIZONTAL);
+        customRow.setGravity(Gravity.CENTER_VERTICAL);
+        customRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        EditText etSeconds = new EditText(this);
+        etSeconds.setHint("秒数");
+        etSeconds.setTextColor(0xFFFFFFFF);
+        etSeconds.setHintTextColor(0xFF888888);
+        etSeconds.setTextSize(14);
+        etSeconds.setInputType(InputType.TYPE_CLASS_NUMBER);
+        etSeconds.setBackgroundColor(0xFF424242);
+        etSeconds.setPadding(dp(8), dp(8), dp(8), dp(8));
+        LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        etParams.rightMargin = dp(4);
+        etSeconds.setLayoutParams(etParams);
+        customRow.addView(etSeconds);
+
+        TextView btnCustom = new TextView(this);
+        btnCustom.setText("开始");
+        btnCustom.setTextColor(0xFFFFFFFF);
+        btnCustom.setTextSize(14);
+        btnCustom.setGravity(Gravity.CENTER);
+        btnCustom.setPadding(dp(12), dp(8), dp(12), dp(8));
+        btnCustom.setBackgroundColor(0xFFD32F2F);
+        btnCustom.setClickable(true);
+        btnCustom.setFocusable(true);
+        btnCustom.setOnClickListener(v -> {
+            String input = etSeconds.getText().toString().trim();
+            if (input.isEmpty()) {
+                Toast.makeText(this, "请输入秒数", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            try {
+                int seconds = Integer.parseInt(input);
+                if (seconds <= 0) {
+                    Toast.makeText(this, "请输入大于0的秒数", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                playerManager.startSleepTimerSeconds(seconds);
+                Toast.makeText(this, seconds + "秒后自动停止播放", Toast.LENGTH_SHORT).show();
+                dismissOverlay();
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
+            }
+        });
+        customRow.addView(btnCustom);
+
+        contentLayout.addView(customRow);
 
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);

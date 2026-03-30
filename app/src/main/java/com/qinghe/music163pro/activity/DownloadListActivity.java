@@ -25,8 +25,8 @@ import java.util.List;
  */
 public class DownloadListActivity extends AppCompatActivity {
 
-    private final List<File> downloadedFiles = new ArrayList<>();
-    private ArrayAdapter<File> adapter;
+    private final List<Song> downloadedSongs = new ArrayList<>();
+    private ArrayAdapter<Song> adapter;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -36,28 +36,16 @@ public class DownloadListActivity extends AppCompatActivity {
         ListView lvDownloads = findViewById(R.id.lv_downloads);
         TextView tvEmpty = findViewById(R.id.tv_empty);
 
-        adapter = new ArrayAdapter<File>(this, R.layout.item_song, R.id.tv_item_name, downloadedFiles) {
+        adapter = new ArrayAdapter<Song>(this, R.layout.item_song, R.id.tv_item_name, downloadedSongs) {
             @Override
             public View getView(int position, View convertView, ViewGroup parent) {
                 View view = super.getView(position, convertView, parent);
-                File file = getItem(position);
-                if (file != null) {
+                Song song = getItem(position);
+                if (song != null) {
                     TextView tvName = view.findViewById(R.id.tv_item_name);
                     TextView tvArtist = view.findViewById(R.id.tv_item_artist);
-                    String name = file.getName();
-                    // Remove .mp3 extension
-                    if (name.endsWith(".mp3")) {
-                        name = name.substring(0, name.length() - 4);
-                    }
-                    // Split by " - " to get song name and artist
-                    int dashIdx = name.indexOf(" - ");
-                    if (dashIdx > 0) {
-                        tvName.setText(name.substring(0, dashIdx));
-                        tvArtist.setText(name.substring(dashIdx + 3));
-                    } else {
-                        tvName.setText(name);
-                        tvArtist.setText("");
-                    }
+                    tvName.setText(song.getName());
+                    tvArtist.setText(song.getArtist());
                 }
                 return view;
             }
@@ -70,7 +58,7 @@ public class DownloadListActivity extends AppCompatActivity {
 
         loadDownloads();
 
-        if (downloadedFiles.isEmpty()) {
+        if (downloadedSongs.isEmpty()) {
             tvEmpty.setVisibility(View.VISIBLE);
             lvDownloads.setVisibility(View.GONE);
         } else {
@@ -86,25 +74,35 @@ public class DownloadListActivity extends AppCompatActivity {
     }
 
     private void loadDownloads() {
-        downloadedFiles.clear();
-        downloadedFiles.addAll(DownloadManager.getDownloadedFiles());
+        downloadedSongs.clear();
+
+        // Load from new subfolder format (with info.json)
+        List<File> songDirs = DownloadManager.getDownloadedSongDirs();
+        for (File dir : songDirs) {
+            Song song = DownloadManager.loadSongInfo(dir);
+            if (song != null) {
+                downloadedSongs.add(song);
+            }
+        }
+
+        // Load legacy flat .mp3 files (backward compatibility)
+        List<File> legacyFiles = DownloadManager.getDownloadedFiles();
+        for (File file : legacyFiles) {
+            Song song = fileToSong(file);
+            downloadedSongs.add(song);
+        }
+
         if (adapter != null) {
             adapter.notifyDataSetChanged();
         }
     }
 
     /**
-     * Build a full playlist from all downloaded files and play the selected one.
-     * Uses local file paths as URLs so MusicPlayerManager.playCurrent() can
-     * fall back to the cached URL (local path) for playback.
+     * Build a full playlist from all downloaded songs and play the selected one.
      */
     private void playDownloadedSong(int position) {
         try {
-            List<Song> playlist = new ArrayList<>();
-            for (File file : downloadedFiles) {
-                Song song = fileToSong(file);
-                playlist.add(song);
-            }
+            List<Song> playlist = new ArrayList<>(downloadedSongs);
 
             MusicPlayerManager playerManager = MusicPlayerManager.getInstance();
             playerManager.setPlaylist(playlist, position);
@@ -120,6 +118,9 @@ public class DownloadListActivity extends AppCompatActivity {
         }
     }
 
+    /**
+     * Convert a legacy flat .mp3 file to a Song (id=0, parsed from filename).
+     */
     private Song fileToSong(File file) {
         String name = file.getName();
         if (name.endsWith(".mp3")) {
