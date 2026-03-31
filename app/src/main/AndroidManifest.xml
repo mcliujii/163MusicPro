@@ -37,6 +37,10 @@
         <activity android:name=".activity.SmsLoginActivity" android:exported="false" />
         <activity android:name=".activity.LyricsActivity" android:exported="false" />
         <activity android:name=".activity.RingtoneListActivity" android:exported="false" />
+        <activity android:name=".activity.ProfileActivity" android:exported="false" />
+        <activity android:name=".activity.TopListActivity" android:exported="false" />
+        <activity android:name=".activity.TopListDetailActivity" android:exported="false" />
+        <activity android:name=".activity.HistoryActivity" android:exported="false" />
 
         <service
             android:name=".service.MusicPlaybackService"

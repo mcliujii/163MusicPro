@@ -37,6 +37,7 @@ import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.manager.FavoritesManager;
+import com.qinghe.music163pro.manager.HistoryManager;
 import com.qinghe.music163pro.manager.RingtoneManagerHelper;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -1455,6 +1456,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         tvSongName.setText(song.getName());
         tvArtist.setText(song.getArtist());
         startPlaybackService(song.getName(), song.getArtist());
+        // Save to play history
+        HistoryManager.getInstance().addToHistory(song);
     }
 
     @Override

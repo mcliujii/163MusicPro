@@ -125,12 +125,36 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface AccountCallback {
+        void onResult(JSONObject accountJson);
+        void onError(String message);
+    }
+
+    public interface TopListCallback {
+        void onResult(JSONArray listArray);
+        void onError(String message);
+    }
+
+    public interface PlaylistDetailCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
+    public interface PersonalFMCallback {
+        void onResult(List<Song> songs);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
+        searchSongs(keyword, 0, cookie, callback);
+    }
+
+    public static void searchSongs(String keyword, int offset, String cookie, SearchCallback callback) {
         executor.execute(() -> {
             try {
-                List<Song> songs = searchDirect(keyword, cookie);
+                List<Song> songs = searchDirect(keyword, offset, cookie);
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 Log.w(TAG, "Search error", e);
@@ -142,12 +166,12 @@ public class MusicApiHelper {
     /**
      * Search via weapi/cloudsearch/pc (same as NeteaseCloudMusicApiBackup module/cloudsearch.js)
      */
-    private static List<Song> searchDirect(String keyword, String cookie) throws Exception {
+    private static List<Song> searchDirect(String keyword, int offset, String cookie) throws Exception {
         JSONObject data = new JSONObject();
         data.put("s", keyword);
         data.put("type", 1);      // 1 = songs
         data.put("limit", 20);
-        data.put("offset", 0);
+        data.put("offset", offset);
         data.put("total", true);
 
         String csrfToken = extractCsrfToken(cookie);
@@ -737,6 +761,148 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(idSet));
             } catch (Exception e) {
                 Log.w(TAG, "Cloud liked IDs error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== User Account ====================
+
+    /**
+     * Get user account info including profile and VIP details.
+     */
+    public static void getUserAccount(String cookie, AccountCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/w/nuser/account/get", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                mainHandler.post(() -> callback.onResult(json));
+            } catch (Exception e) {
+                Log.w(TAG, "Get account error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== Top List ====================
+
+    /**
+     * Get all top/chart lists.
+     * (same as NeteaseCloudMusicApiBackup module/toplist.js)
+     */
+    public static void getTopList(String cookie, TopListCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/toplist", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray list = json.optJSONArray("list");
+                if (list != null) {
+                    mainHandler.post(() -> callback.onResult(list));
+                } else {
+                    mainHandler.post(() -> callback.onError("获取排行榜失败"));
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "Top list error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get playlist detail (tracks) by playlist ID.
+     */
+    public static void getPlaylistDetail(long playlistId, String cookie, PlaylistDetailCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                data.put("n", 200);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v6/playlist/detail", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject playlist = json.optJSONObject("playlist");
+                if (playlist == null) {
+                    mainHandler.post(() -> callback.onError("获取歌单详情失败"));
+                    return;
+                }
+
+                JSONArray tracks = playlist.optJSONArray("tracks");
+                List<Song> songs = new ArrayList<>();
+                if (tracks != null) {
+                    int limit = Math.min(tracks.length(), 200);
+                    for (int i = 0; i < limit; i++) {
+                        JSONObject s = tracks.getJSONObject(i);
+                        long id = s.getLong("id");
+                        String name = s.getString("name");
+                        String artist = "";
+                        JSONArray ar = s.optJSONArray("ar");
+                        if (ar != null && ar.length() > 0) {
+                            artist = ar.getJSONObject(0).optString("name", "");
+                        }
+                        String album = "";
+                        JSONObject al = s.optJSONObject("al");
+                        if (al != null) {
+                            album = al.optString("name", "");
+                        }
+                        songs.add(new Song(id, name, artist, album));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                Log.w(TAG, "Playlist detail error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    // ==================== Personal FM ====================
+
+    /**
+     * Get personal FM songs.
+     * (same as NeteaseCloudMusicApiBackup module/personal_fm.js)
+     */
+    public static void getPersonalFM(String cookie, PersonalFMCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/v1/radio/get", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray dataArr = json.optJSONArray("data");
+                List<Song> songs = new ArrayList<>();
+                if (dataArr != null) {
+                    for (int i = 0; i < dataArr.length(); i++) {
+                        JSONObject s = dataArr.getJSONObject(i);
+                        long id = s.getLong("id");
+                        String name = s.getString("name");
+                        String artist = "";
+                        JSONArray artists = s.optJSONArray("artists");
+                        if (artists != null && artists.length() > 0) {
+                            artist = artists.getJSONObject(0).optString("name", "");
+                        }
+                        String album = "";
+                        JSONObject albumObj = s.optJSONObject("album");
+                        if (albumObj != null) {
+                            album = albumObj.optString("name", "");
+                        }
+                        songs.add(new Song(id, name, artist, album));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                Log.w(TAG, "Personal FM error", e);
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });
