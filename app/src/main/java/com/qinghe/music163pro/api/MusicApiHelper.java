@@ -120,6 +120,11 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface CloudLikedIdsCallback {
+        void onResult(java.util.Set<Long> ids);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -575,7 +580,8 @@ public class MusicApiHelper {
                 JSONObject detailJson = new JSONObject(detailResponse);
                 JSONArray songsArray = detailJson.optJSONArray("songs");
 
-                List<Song> songs = new ArrayList<>();
+                // Build a map of id -> Song for reordering
+                java.util.Map<Long, Song> songMap = new java.util.LinkedHashMap<>();
                 if (songsArray != null) {
                     for (int i = 0; i < songsArray.length(); i++) {
                         JSONObject s = songsArray.getJSONObject(i);
@@ -591,7 +597,17 @@ public class MusicApiHelper {
                         if (al != null) {
                             album = al.optString("name", "");
                         }
-                        songs.add(new Song(id, name, artist, album));
+                        songMap.put(id, new Song(id, name, artist, album));
+                    }
+                }
+
+                // Reorder songs to match the original liked-time order from idsArray
+                List<Song> songs = new ArrayList<>();
+                for (int i = 0; i < limit; i++) {
+                    long id = idsArray.getLong(i);
+                    Song song = songMap.get(id);
+                    if (song != null) {
+                        songs.add(song);
                     }
                 }
                 mainHandler.post(() -> callback.onResult(songs));
@@ -624,6 +640,41 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(code == 200));
             } catch (Exception e) {
                 Log.w(TAG, "Like track error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get the set of liked song IDs from the cloud (for checking like status).
+     */
+    public static void getCloudLikedIds(String cookie, CloudLikedIdsCallback callback) {
+        executor.execute(() -> {
+            try {
+                long uid = extractUidFromCookie(cookie);
+                if (uid <= 0) {
+                    mainHandler.post(() -> callback.onError("请先登录"));
+                    return;
+                }
+
+                JSONObject likeData = new JSONObject();
+                likeData.put("uid", uid);
+                String csrfToken = extractCsrfToken(cookie);
+                likeData.put("csrf_token", csrfToken);
+
+                String likeResponse = weapiPost("/api/song/like/get", likeData.toString(), cookie);
+                JSONObject likeJson = new JSONObject(likeResponse);
+
+                JSONArray idsArray = likeJson.optJSONArray("ids");
+                java.util.Set<Long> idSet = new java.util.HashSet<>();
+                if (idsArray != null) {
+                    for (int i = 0; i < idsArray.length(); i++) {
+                        idSet.add(idsArray.getLong(i));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(idSet));
+            } catch (Exception e) {
+                Log.w(TAG, "Cloud liked IDs error", e);
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });

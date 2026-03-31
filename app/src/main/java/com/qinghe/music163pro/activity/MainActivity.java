@@ -14,7 +14,9 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.provider.MediaStore;
 import android.text.InputType;
+import android.view.GestureDetector;
 import android.view.Gravity;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
@@ -246,6 +248,26 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Close overlay on background click
         overlayContainer.setOnClickListener(v -> dismissOverlay());
 
+        // Swipe right to dismiss
+        GestureDetector gestureDetector = new GestureDetector(this, new GestureDetector.SimpleOnGestureListener() {
+            @Override
+            public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
+                if (e1 != null && e2 != null) {
+                    float diffX = e2.getX() - e1.getX();
+                    float diffY = Math.abs(e2.getY() - e1.getY());
+                    if (diffX > 80 && diffY < 200 && Math.abs(velocityX) > 200) {
+                        dismissOverlay();
+                        return true;
+                    }
+                }
+                return false;
+            }
+        });
+        overlayContainer.setOnTouchListener((v, event) -> {
+            gestureDetector.onTouchEvent(event);
+            return false;
+        });
+
         // Content layout - centered, scrollable
         ScrollView scrollView = new ScrollView(this);
         FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
@@ -276,7 +298,15 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         // Row 1: 收藏 + 下载
-        boolean isFav = favoritesManager.isFavorite(song.getId());
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        boolean isCloudMode = prefs.getBoolean("fav_mode_cloud", false);
+        boolean isFav;
+        if (isCloudMode) {
+            // In cloud mode, check cached cloud liked IDs
+            isFav = isCloudLiked(song.getId());
+        } else {
+            isFav = favoritesManager.isFavorite(song.getId());
+        }
         row1.addView(createFuncItem(isFav ? "♥" : "♡", isFav ? "取消收藏" : "收藏",
                 v -> onFuncFavorite(song)));
         row1.addView(createFuncItem("⬇", "下载",
@@ -355,6 +385,24 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 v -> onFuncLyrics()));
         contentLayout.addView(row3);
 
+        // Row 4: 倍速播放
+        LinearLayout row4 = new LinearLayout(this);
+        row4.setOrientation(LinearLayout.HORIZONTAL);
+        row4.setGravity(Gravity.CENTER);
+        row4.setPadding(0, dp(4), 0, 0);
+        row4.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        float currentSpeed = playerManager.getPlaybackSpeed();
+        String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
+        row4.addView(createFuncItem("⚡", speedLabel,
+                v -> onFuncPlaybackSpeed()));
+        // Empty placeholder for alignment
+        LinearLayout placeholder = new LinearLayout(this);
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+        row4.addView(placeholder);
+        contentLayout.addView(row4);
+
         // Close button at bottom center
         TextView btnClose = new TextView(this);
         btnClose.setText("✕");
@@ -424,7 +472,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         if (isCloud) {
             // Cloud mode: use API to like/unlike
-            boolean isCurrentlyLiked = favoritesManager.isFavorite(song.getId());
+            boolean isCurrentlyLiked = isCloudLiked(song.getId());
             String cookie = playerManager.getCookie();
             if (cookie == null || cookie.isEmpty()) {
                 Toast.makeText(this, "请先登录以使用云端收藏", Toast.LENGTH_SHORT).show();
@@ -436,6 +484,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 @Override
                 public void onResult(boolean success) {
                     if (success) {
+                        // Update cache
+                        if (cloudLikedIds == null) {
+                            cloudLikedIds = new java.util.HashSet<>();
+                        }
+                        if (isCurrentlyLiked) {
+                            cloudLikedIds.remove(song.getId());
+                        } else {
+                            cloudLikedIds.add(song.getId());
+                        }
+                        cloudLikedCacheTime = System.currentTimeMillis();
                         Toast.makeText(MainActivity.this,
                                 isCurrentlyLiked ? "已取消云端收藏" : "已云端收藏",
                                 Toast.LENGTH_SHORT).show();
@@ -521,6 +579,174 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private void onFuncLyrics() {
         dismissOverlay();
         startActivity(new Intent(this, LyricsActivity.class));
+    }
+
+    // ==================== Playback Speed ====================
+
+    private void onFuncPlaybackSpeed() {
+        dismissOverlay();
+        showSpeedOptions();
+    }
+
+    private void showSpeedOptions() {
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setOnClickListener(v -> dismissOverlay());
+
+        ScrollView scrollView = new ScrollView(this);
+        FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        scrollParams.gravity = Gravity.CENTER;
+        scrollView.setLayoutParams(scrollParams);
+        scrollView.setOnClickListener(v -> { /* consume click */ });
+
+        LinearLayout contentLayout = new LinearLayout(this);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setGravity(Gravity.CENTER);
+        contentLayout.setPadding(dp(20), dp(20), dp(20), dp(20));
+
+        // Title
+        TextView title = new TextView(this);
+        title.setText("倍速播放");
+        title.setTextColor(0xFFFFFFFF);
+        title.setTextSize(15);
+        title.setGravity(Gravity.CENTER);
+        title.setPadding(0, 0, 0, dp(12));
+        contentLayout.addView(title);
+
+        // Preset speed options
+        float[] speeds = {0.8f, 0.9f, 1.0f, 1.1f, 1.2f};
+        float currentSpeed = playerManager.getPlaybackSpeed();
+        for (float speed : speeds) {
+            TextView btn = new TextView(this);
+            String label = String.format("%.1fx", speed);
+            if (speed == 1.0f) label = "1.0x (正常)";
+            btn.setText(label);
+            btn.setTextColor(0xFFFFFFFF);
+            btn.setTextSize(14);
+            btn.setGravity(Gravity.CENTER);
+            btn.setPadding(0, dp(10), 0, dp(10));
+            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFD32F2F : 0xFF424242);
+            LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            btnParams.bottomMargin = dp(4);
+            btn.setLayoutParams(btnParams);
+            btn.setClickable(true);
+            btn.setFocusable(true);
+            float finalSpeed = speed;
+            btn.setOnClickListener(v -> {
+                playerManager.setPlaybackSpeed(finalSpeed);
+                Toast.makeText(this, String.format("播放速度: %.1fx", finalSpeed), Toast.LENGTH_SHORT).show();
+                dismissOverlay();
+            });
+            contentLayout.addView(btn);
+        }
+
+        // Custom speed input
+        TextView customLabel = new TextView(this);
+        customLabel.setText("自定义（0.1-5.0）");
+        customLabel.setTextColor(0xFFCCCCCC);
+        customLabel.setTextSize(13);
+        customLabel.setGravity(Gravity.CENTER);
+        customLabel.setPadding(0, dp(12), 0, dp(4));
+        contentLayout.addView(customLabel);
+
+        LinearLayout customRow = new LinearLayout(this);
+        customRow.setOrientation(LinearLayout.HORIZONTAL);
+        customRow.setGravity(Gravity.CENTER_VERTICAL);
+        customRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        EditText etSpeed = new EditText(this);
+        etSpeed.setHint("倍速");
+        etSpeed.setTextColor(0xFFFFFFFF);
+        etSpeed.setHintTextColor(0xFF888888);
+        etSpeed.setTextSize(14);
+        etSpeed.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
+        etSpeed.setBackgroundColor(0xFF424242);
+        etSpeed.setPadding(dp(8), dp(8), dp(8), dp(8));
+        LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
+        etParams.rightMargin = dp(4);
+        etSpeed.setLayoutParams(etParams);
+        customRow.addView(etSpeed);
+
+        TextView btnApply = new TextView(this);
+        btnApply.setText("应用");
+        btnApply.setTextColor(0xFFFFFFFF);
+        btnApply.setTextSize(14);
+        btnApply.setGravity(Gravity.CENTER);
+        btnApply.setPadding(dp(12), dp(8), dp(12), dp(8));
+        btnApply.setBackgroundColor(0xFFD32F2F);
+        btnApply.setClickable(true);
+        btnApply.setFocusable(true);
+        btnApply.setOnClickListener(v -> {
+            String input = etSpeed.getText().toString().trim();
+            if (input.isEmpty()) {
+                Toast.makeText(this, "请输入倍速值", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            try {
+                float speed = Float.parseFloat(input);
+                if (speed < 0.1f || speed > 5.0f) {
+                    Toast.makeText(this, "请输入0.1-5.0之间的值", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                playerManager.setPlaybackSpeed(speed);
+                Toast.makeText(this, String.format("播放速度: %.1fx", speed), Toast.LENGTH_SHORT).show();
+                dismissOverlay();
+            } catch (NumberFormatException e) {
+                Toast.makeText(this, "请输入有效的数字", Toast.LENGTH_SHORT).show();
+            }
+        });
+        customRow.addView(btnApply);
+
+        contentLayout.addView(customRow);
+
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
+        rootView.addView(overlayContainer);
+    }
+
+    // ==================== Cloud Favorites Status Cache ====================
+
+    private java.util.Set<Long> cloudLikedIds = null;
+    private long cloudLikedCacheTime = 0;
+    private static final long CLOUD_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    /**
+     * Check if a song is liked in cloud mode, using cached IDs.
+     */
+    private boolean isCloudLiked(long songId) {
+        if (cloudLikedIds != null && System.currentTimeMillis() - cloudLikedCacheTime < CLOUD_CACHE_TTL) {
+            return cloudLikedIds.contains(songId);
+        }
+        // If cache is stale/empty, refresh asynchronously
+        refreshCloudLikedIds();
+        return cloudLikedIds != null && cloudLikedIds.contains(songId);
+    }
+
+    /**
+     * Refresh the cached set of cloud liked song IDs.
+     */
+    private void refreshCloudLikedIds() {
+        String cookie = playerManager.getCookie();
+        if (cookie == null || cookie.isEmpty()) return;
+        MusicApiHelper.getCloudLikedIds(cookie, new MusicApiHelper.CloudLikedIdsCallback() {
+            @Override
+            public void onResult(java.util.Set<Long> ids) {
+                cloudLikedIds = ids;
+                cloudLikedCacheTime = System.currentTimeMillis();
+            }
+            @Override
+            public void onError(String message) {
+                // Ignore errors silently; cache remains stale
+            }
+        });
     }
 
     private void onFuncSetRingtone(Song song) {

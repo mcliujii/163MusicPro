@@ -189,7 +189,8 @@ public class SearchActivity extends AppCompatActivity {
     }
 
     /**
-     * Show a confirmation dialog with consistent dark theme style.
+     * Show a confirmation dialog adapted for watch (360x320 px screen).
+     * Uses fixed pixel values for consistent sizing on watch displays.
      */
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
         FrameLayout rootView = findViewById(android.R.id.content);
@@ -202,30 +203,30 @@ public class SearchActivity extends AppCompatActivity {
         LinearLayout dialog = new LinearLayout(this);
         dialog.setOrientation(LinearLayout.VERTICAL);
         dialog.setBackgroundColor(0xFF424242);
-        dialog.setPadding(dp(20), dp(16), dp(20), dp(16));
+        dialog.setPadding(px(16), px(12), px(16), px(12));
         FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
         dlgParams.gravity = Gravity.CENTER;
-        dlgParams.leftMargin = dp(20);
-        dlgParams.rightMargin = dp(20);
+        dlgParams.leftMargin = px(16);
+        dlgParams.rightMargin = px(16);
         dialog.setLayoutParams(dlgParams);
 
         // Title
         TextView tvTitle = new TextView(this);
         tvTitle.setText(title);
         tvTitle.setTextColor(0xFFFFFFFF);
-        tvTitle.setTextSize(15);
+        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
         tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, dp(8));
+        tvTitle.setPadding(0, 0, 0, px(6));
         dialog.addView(tvTitle);
 
         // Message
         TextView tvMessage = new TextView(this);
         tvMessage.setText(message);
         tvMessage.setTextColor(0xFFCCCCCC);
-        tvMessage.setTextSize(13);
+        tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         tvMessage.setGravity(Gravity.CENTER);
-        tvMessage.setPadding(0, 0, 0, dp(16));
+        tvMessage.setPadding(0, 0, 0, px(12));
         dialog.addView(tvMessage);
 
         // Buttons row
@@ -238,13 +239,13 @@ public class SearchActivity extends AppCompatActivity {
         TextView btnCancel = new TextView(this);
         btnCancel.setText("取消");
         btnCancel.setTextColor(0xFFFFFFFF);
-        btnCancel.setTextSize(14);
+        btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnCancel.setGravity(Gravity.CENTER);
-        btnCancel.setPadding(dp(16), dp(8), dp(16), dp(8));
+        btnCancel.setPadding(px(12), px(8), px(12), px(8));
         btnCancel.setBackgroundColor(0xFF616161);
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        cancelParams.rightMargin = dp(4);
+        cancelParams.rightMargin = px(4);
         btnCancel.setLayoutParams(cancelParams);
         btnCancel.setClickable(true);
         btnCancel.setFocusable(true);
@@ -255,13 +256,13 @@ public class SearchActivity extends AppCompatActivity {
         TextView btnConfirm = new TextView(this);
         btnConfirm.setText("确定");
         btnConfirm.setTextColor(0xFFFFFFFF);
-        btnConfirm.setTextSize(14);
+        btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnConfirm.setGravity(Gravity.CENTER);
-        btnConfirm.setPadding(dp(16), dp(8), dp(16), dp(8));
+        btnConfirm.setPadding(px(12), px(8), px(12), px(8));
         btnConfirm.setBackgroundColor(0xFFD32F2F);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
-        confirmParams.leftMargin = dp(4);
+        confirmParams.leftMargin = px(4);
         btnConfirm.setLayoutParams(confirmParams);
         btnConfirm.setClickable(true);
         btnConfirm.setFocusable(true);
@@ -275,6 +276,15 @@ public class SearchActivity extends AppCompatActivity {
         overlay.setOnClickListener(v -> rootView.removeView(overlay));
         dialog.setOnClickListener(v -> { /* consume click */ });
         rootView.addView(overlay);
+    }
+
+    /**
+     * Convert a value scaled for a 320px-wide watch screen to actual pixels.
+     * Base reference: 320px width. Values are proportionally scaled.
+     */
+    private int px(int baseValue) {
+        int screenWidth = getResources().getDisplayMetrics().widthPixels;
+        return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
 
     private int dp(int dp) {
