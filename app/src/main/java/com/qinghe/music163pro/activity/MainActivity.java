@@ -839,15 +839,21 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer.setBackgroundColor(0xCC333333);
         addSwipeToDismiss(overlayContainer);
 
+        // Wrap content in ScrollView for small watch screens
+        ScrollView scrollView = new ScrollView(this);
+        FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        scrollView.setLayoutParams(scrollParams);
+        scrollView.setFillViewport(true);
+
         LinearLayout contentLayout = new LinearLayout(this);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
         contentLayout.setGravity(Gravity.CENTER);
         contentLayout.setPadding(dp(16), dp(12), dp(16), dp(12));
         contentLayout.setOnClickListener(v -> { /* consume click */ });
 
-        FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
-        contentParams.gravity = Gravity.CENTER;
+        LinearLayout.LayoutParams contentParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         contentLayout.setLayoutParams(contentParams);
 
         // Title bar with close button
@@ -999,12 +1005,17 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         contentLayout.addView(btnRow);
 
-        overlayContainer.addView(contentLayout);
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
         rootView.addView(overlayContainer);
     }
 
     private void previewRingtoneClip(File file, int startMs, int endMs) {
         stopRingtonePreview();
+        // Pause current music playback if playing
+        if (playerManager.isPlaying()) {
+            playerManager.pause();
+        }
         try {
             ringtonePreviewPlayer = new MediaPlayer();
             ringtonePreviewPlayer.setDataSource(file.getAbsolutePath());

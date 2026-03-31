@@ -404,26 +404,23 @@ public class MusicApiHelper {
     /**
      * Login with phone number and SMS captcha
      * (same as NeteaseCloudMusicApiBackup module/login_cellphone.js)
-     * Uses os=android cookie to avoid "环境不安全" error.
+     * Uses mobile cookie and weapi encryption.
      */
     public static void loginByCellphone(String phone, String captcha, String ctcode,
                                          LoginCallback callback) {
         executor.execute(() -> {
             try {
                 JSONObject data = new JSONObject();
-                data.put("type", "1");
-                data.put("https", "true");
                 data.put("phone", phone);
                 data.put("countrycode", ctcode != null && !ctcode.isEmpty() ? ctcode : "86");
                 data.put("captcha", captcha);
                 data.put("rememberLogin", "true");
-                data.put("checkToken", "");
 
                 String[] encrypted = NeteaseApiCrypto.weapi(data.toString());
                 String postBody = "params=" + URLEncoder.encode(encrypted[0], "UTF-8")
                         + "&encSecKey=" + URLEncoder.encode(encrypted[1], "UTF-8");
 
-                String urlStr = DOMAIN + "/weapi/w/login/cellphone";
+                String urlStr = DOMAIN + "/weapi/login/cellphone";
                 URL url = new URL(urlStr);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
                 conn.setRequestMethod("POST");
@@ -879,6 +876,7 @@ public class MusicApiHelper {
     /**
      * Build a cookie string with Android mobile device identity.
      * Used for SMS login to avoid "环境不安全" error.
+     * Based on NeteaseCloudMusicApiBackup util/request.js default cookies.
      */
     private static String buildMobileCookie(String existingCookie) {
         StringBuilder sb = new StringBuilder();
@@ -891,12 +889,28 @@ public class MusicApiHelper {
         sb.append("__remember_me=true; ");
         sb.append("ntes_kaola_ad=1; ");
         sb.append("WEVNSM=1.0.0; ");
+        sb.append("NMTID=").append(generateHexId(16)).append("; ");
+        sb.append("_ntes_nuid=").append(generateHexId(16)).append("; ");
         sb.append("osver=13; ");
         sb.append("deviceId=").append(deviceId).append("; ");
         sb.append("os=android; ");
         sb.append("channel=").append(CHANNEL).append("; ");
         sb.append("appver=").append(APP_VER);
         return sb.toString();
+    }
+
+    /**
+     * Generate a random hex string of the specified byte length.
+     */
+    private static String generateHexId(int byteLength) {
+        java.security.SecureRandom random = new java.security.SecureRandom();
+        byte[] bytes = new byte[byteLength];
+        random.nextBytes(bytes);
+        StringBuilder hex = new StringBuilder();
+        for (byte b : bytes) {
+            hex.append(String.format("%02x", b));
+        }
+        return hex.toString();
     }
 
     /**
