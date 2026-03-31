@@ -269,8 +269,4 @@ public class DownloadListActivity extends AppCompatActivity {
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         return (int) (baseValue * screenWidth / 320f + 0.5f);
     }
-
-    private int dp(int dp) {
-        return (int) (dp * getResources().getDisplayMetrics().density + 0.5f);
-    }
 }
