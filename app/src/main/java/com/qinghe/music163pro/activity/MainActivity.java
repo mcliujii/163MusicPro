@@ -192,7 +192,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         updateUI();
 
         // Start foreground service to keep alive
-        startPlaybackService("163音乐", "等待播放");
+        startPlaybackService("163音乐", "等待播放", false);
 
         // Request storage permission for saving favorites to /sdcard/163Music/
         requestStoragePermission();
@@ -1455,7 +1455,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     public void onSongChanged(Song song) {
         tvSongName.setText(song.getName());
         tvArtist.setText(song.getArtist());
-        startPlaybackService(song.getName(), song.getArtist());
+        startPlaybackService(song.getName(), song.getArtist(), true);
         // Save to play history
         HistoryManager.getInstance().addToHistory(song);
     }
@@ -1465,15 +1465,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPlay.setText(isPlaying ? "\u23F8" : "\u25B6");
         if (isPlaying) {
             startSeekBarUpdate();
-            if (!serviceStarted) {
-                Song song = playerManager.getCurrentSong();
-                String name = song != null ? song.getName() : "";
-                String artist = song != null ? song.getArtist() : "";
-                startPlaybackService(name, artist);
-            }
         } else {
             stopSeekBarUpdate();
         }
+        // Always update notification with current play state
+        Song song = playerManager.getCurrentSong();
+        String name = song != null ? song.getName() : "";
+        String artist = song != null ? song.getArtist() : "";
+        startPlaybackService(name, artist, isPlaying);
     }
 
     @Override
@@ -1507,10 +1506,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         seekHandler.removeCallbacks(seekBarUpdateRunnable);
     }
 
-    private void startPlaybackService(String songName, String artist) {
+    private void startPlaybackService(String songName, String artist, boolean isPlaying) {
         Intent serviceIntent = new Intent(this, MusicPlaybackService.class);
         serviceIntent.putExtra("song_name", songName);
         serviceIntent.putExtra("artist", artist);
+        serviceIntent.putExtra("is_playing", isPlaying);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             startForegroundService(serviceIntent);
         } else {
