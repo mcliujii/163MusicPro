@@ -113,10 +113,9 @@ public class ProfileActivity extends AppCompatActivity {
             JSONObject musicPackage = data.optJSONObject("musicPackage");
 
             if (associator != null) {
-                // VIP start date (dynamicIconUrl may contain start info, but use available fields)
+                // VIP start date
                 long startTime = associator.optLong("startTime", 0);
                 if (startTime <= 0) {
-                    // Try iconUrl timestamp or vipCode timestamp
                     startTime = associator.optLong("createTime", 0);
                 }
                 if (startTime > 0) {
