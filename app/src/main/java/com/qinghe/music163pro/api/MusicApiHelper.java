@@ -130,6 +130,11 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface VipInfoCallback {
+        void onResult(JSONObject vipJson);
+        void onError(String message);
+    }
+
     public interface TopListCallback {
         void onResult(JSONArray listArray);
         void onError(String message);
@@ -479,6 +484,22 @@ public class MusicApiHelper {
                     String cookieStr = "";
                     if (code == 200) {
                         cookieStr = extractSetCookies(conn);
+                        // Fallback: if Set-Cookie headers are empty, try token from JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("token")) {
+                            String token = json.optString("token", "");
+                            if (!token.isEmpty()) {
+                                cookieStr = "MUSIC_U=" + token;
+                            }
+                        }
+                        // Also try cookie field in JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("cookie")) {
+                            String bodyCookie = json.optString("cookie", "");
+                            if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
+                                cookieStr = bodyCookie;
+                            }
+                        }
                     }
 
                     final String finalCookie = cookieStr;
@@ -559,6 +580,22 @@ public class MusicApiHelper {
                     String cookieStr = "";
                     if (code == 200) {
                         cookieStr = extractSetCookies(conn);
+                        // Fallback: if Set-Cookie headers are empty, try token from JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("token")) {
+                            String token = json.optString("token", "");
+                            if (!token.isEmpty()) {
+                                cookieStr = "MUSIC_U=" + token;
+                            }
+                        }
+                        // Also try cookie field in JSON body
+                        if ((cookieStr == null || cookieStr.isEmpty() || !cookieStr.contains("MUSIC_U"))
+                                && json.has("cookie")) {
+                            String bodyCookie = json.optString("cookie", "");
+                            if (!bodyCookie.isEmpty() && bodyCookie.contains("MUSIC_U")) {
+                                cookieStr = bodyCookie;
+                            }
+                        }
                     }
 
                     final String finalCookie = cookieStr;
@@ -863,6 +900,27 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
                 Log.w(TAG, "Get account error", e);
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        });
+    }
+
+    /**
+     * Get VIP user info including expiry time.
+     * (same as NeteaseCloudMusicApiBackup module/vip_info.js)
+     */
+    public static void getVipInfo(String cookie, VipInfoCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/music-vip-user/info", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                mainHandler.post(() -> callback.onResult(json));
+            } catch (Exception e) {
+                Log.w(TAG, "Get VIP info error", e);
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
         });

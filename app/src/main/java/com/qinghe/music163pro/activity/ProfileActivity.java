@@ -69,6 +69,8 @@ public class ProfileActivity extends AppCompatActivity {
             public void onResult(JSONObject json) {
                 contentLayout.removeView(tvLoading);
                 displayAccountInfo(json);
+                // Also fetch VIP info separately for reliable expiry time
+                fetchVipInfo(cookie);
             }
 
             @Override
@@ -76,6 +78,70 @@ public class ProfileActivity extends AppCompatActivity {
                 tvLoading.setText("加载失败: " + message);
             }
         });
+    }
+
+    /**
+     * Fetch VIP info from dedicated endpoint for reliable expiry display.
+     */
+    private void fetchVipInfo(String cookie) {
+        MusicApiHelper.getVipInfo(cookie, new MusicApiHelper.VipInfoCallback() {
+            @Override
+            public void onResult(JSONObject json) {
+                displayVipInfo(json);
+            }
+
+            @Override
+            public void onError(String message) {
+                // VIP info is supplementary, don't show error
+            }
+        });
+    }
+
+    private void displayVipInfo(JSONObject json) {
+        try {
+            JSONObject data = json.optJSONObject("data");
+            if (data == null) return;
+
+            addSectionTitle("VIP详情");
+
+            // redVipLevel / musicPackage info
+            JSONObject redVipLevel = data.optJSONObject("redVipLevel");
+            JSONObject associator = data.optJSONObject("associator");
+            JSONObject musicPackage = data.optJSONObject("musicPackage");
+
+            if (associator != null) {
+                boolean isVip = associator.optBoolean("vipCode", false)
+                        || associator.optInt("vipCode", 0) == 1;
+                long expTime = associator.optLong("expTime", 0);
+                if (expTime > 0) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    boolean expired = expTime < System.currentTimeMillis();
+                    addInfoRow("黑胶VIP到期", sdf.format(new java.util.Date(expTime))
+                            + (expired ? " (已过期)" : " ✓"));
+                }
+            }
+            if (musicPackage != null) {
+                long expTime = musicPackage.optLong("expTime", 0);
+                if (expTime > 0) {
+                    java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    boolean expired = expTime < System.currentTimeMillis();
+                    addInfoRow("音乐包到期", sdf.format(new java.util.Date(expTime))
+                            + (expired ? " (已过期)" : " ✓"));
+                }
+            }
+
+            // Try to get remaining days from redVipDynamicIconUrl or other fields
+            long now = System.currentTimeMillis();
+            if (associator != null) {
+                long expTime = associator.optLong("expTime", 0);
+                if (expTime > now) {
+                    long days = (expTime - now) / (1000 * 60 * 60 * 24);
+                    addInfoRow("VIP剩余", days + " 天");
+                }
+            }
+        } catch (Exception e) {
+            // Non-critical, ignore
+        }
     }
 
     private void displayAccountInfo(JSONObject json) {
