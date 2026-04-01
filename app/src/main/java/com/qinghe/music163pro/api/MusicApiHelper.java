@@ -1407,8 +1407,9 @@ public class MusicApiHelper {
 
     /**
      * Recognize a song from PCM audio data (听歌识曲).
-     * Uses a plain GET to interface.music.163.com with shazam_v2 algorithm.
-     * (NeteaseCloudMusicApiBackup module/audio_match.js)
+     * Sends a POST with form-encoded body to interface.music.163.com to avoid
+     * HTTP 414 (URI Too Long) that occurs when large base64 PCM is in the URL.
+     * Endpoint and params match NeteaseCloudMusicApiBackup module/audio_match.js.
      *
      * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono)
      * @param cookie   user cookie (may be null/empty, not required)
@@ -1425,27 +1426,32 @@ public class MusicApiHelper {
                 // Encode PCM as base64
                 String audioBase64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP);
 
-                // Build GET URL (matches audio_match.js from NeteaseCloudMusicApiBackup)
-                String apiUrlBase = "https://interface.music.163.com/api/music/audio/match";
-                String apiUrl = apiUrlBase
-                        + "?sessionId=0123456789abcdef"
+                // POST body — same params as audio_match.js but in body to avoid HTTP 414
+                String postBody = "sessionId=0123456789abcdef"
                         + "&algorithmCode=shazam_v2"
                         + "&duration=" + durationSec
                         + "&rawdata=" + URLEncoder.encode(audioBase64, "UTF-8")
                         + "&times=1"
                         + "&decrypt=1";
 
-                MusicLog.i(TAG, "[REQ] GET " + apiUrlBase + " duration=" + durationSec + "s");
+                String apiUrl = "https://interface.music.163.com/api/music/audio/match";
+                MusicLog.i(TAG, "[REQ] POST " + apiUrl + " duration=" + durationSec + "s");
 
                 URL url = new URL(apiUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
                 conn.setRequestProperty("User-Agent", USER_AGENT);
                 conn.setRequestProperty("Referer", DOMAIN);
                 conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 conn.setReadTimeout(READ_TIMEOUT_MS);
 
                 try {
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(postBody.getBytes("UTF-8"));
+                    }
+
                     int responseCode = conn.getResponseCode();
                     BufferedReader reader;
                     if (responseCode >= 200 && responseCode < 400) {
@@ -1463,7 +1469,7 @@ public class MusicApiHelper {
                     }
                     reader.close();
                     String response = sb.toString();
-                    MusicLog.api(TAG, "GET", apiUrlBase, responseCode, response);
+                    MusicLog.api(TAG, "POST", apiUrl, responseCode, response);
 
                     JSONObject json = new JSONObject(response);
                     int code = json.optInt("code", -1);
@@ -1503,7 +1509,8 @@ public class MusicApiHelper {
 
     /**
      * Recognize a song from humming PCM audio data (哼歌识曲).
-     * Uses a plain GET to interface.music.163.com/api/music/audio/hum.
+     * Sends a POST with form-encoded body to interface.music.163.com to avoid
+     * HTTP 414 (URI Too Long) that occurs when large base64 PCM is in the URL.
      *
      * @param pcmData  raw PCM bytes (16-bit LE, 16kHz, mono)
      * @param cookie   user cookie (may be null/empty, not required)
@@ -1519,25 +1526,30 @@ public class MusicApiHelper {
 
                 String audioBase64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP);
 
-                // Use interface.music.163.com — same domain as audio_match
-                String apiUrlBase = "https://interface.music.163.com/api/music/audio/hum";
-                String apiUrl = apiUrlBase
-                        + "?sessionId=0123456789abcdef"
+                // POST body — params in body to avoid HTTP 414 URI Too Long
+                String postBody = "sessionId=0123456789abcdef"
                         + "&duration=" + durationSec
                         + "&rawdata=" + URLEncoder.encode(audioBase64, "UTF-8")
                         + "&times=1";
 
-                MusicLog.i(TAG, "[REQ] GET " + apiUrlBase + " duration=" + durationSec + "s");
+                String apiUrl = "https://interface.music.163.com/api/music/audio/hum";
+                MusicLog.i(TAG, "[REQ] POST " + apiUrl + " duration=" + durationSec + "s");
 
                 URL url = new URL(apiUrl);
                 HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setRequestMethod("GET");
+                conn.setRequestMethod("POST");
+                conn.setDoOutput(true);
+                conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
                 conn.setRequestProperty("User-Agent", USER_AGENT);
                 conn.setRequestProperty("Referer", DOMAIN);
                 conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
                 conn.setReadTimeout(READ_TIMEOUT_MS);
 
                 try {
+                    try (OutputStream os = conn.getOutputStream()) {
+                        os.write(postBody.getBytes("UTF-8"));
+                    }
+
                     int responseCode = conn.getResponseCode();
                     BufferedReader reader;
                     if (responseCode >= 200 && responseCode < 400) {
@@ -1555,7 +1567,7 @@ public class MusicApiHelper {
                     }
                     reader.close();
                     String response = sb.toString();
-                    MusicLog.api(TAG, "GET", apiUrlBase, responseCode, response);
+                    MusicLog.api(TAG, "POST", apiUrl, responseCode, response);
 
                     JSONObject json = new JSONObject(response);
                     int code = json.optInt("code", -1);
