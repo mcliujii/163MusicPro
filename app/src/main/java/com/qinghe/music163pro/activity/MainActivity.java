@@ -852,7 +852,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         SharedPreferences transPrefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         translationEnabled = transPrefs.getBoolean("lyrics_translation", false);
         btnTranslationToggle = new TextView(this);
-        btnTranslationToggle.setText(translationEnabled ? "译" : "译");
+        btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
         btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
         btnTranslationToggle.setTextSize(12);
         btnTranslationToggle.setGravity(Gravity.CENTER);
@@ -1103,6 +1103,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         prefs.edit().putBoolean("lyrics_translation", translationEnabled).apply();
         // Update button appearance
         if (btnTranslationToggle != null) {
+            btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
             btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
         }
         // Re-display lyrics with or without translation
@@ -1204,11 +1205,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                             currentView.setTextSize(14);
 
                             // Scroll to center the current line
+                            // The lyric TextView is inside a lineLayout container,
+                            // so use the parent container's position for scrolling
                             currentView.post(() -> {
                                 if (lyricsScrollView == null) return;
                                 int scrollViewHeight = lyricsScrollView.getHeight();
-                                int targetTop = currentView.getTop();
-                                int targetHeight = currentView.getHeight();
+                                View parentLayout = (View) currentView.getParent();
+                                int targetTop = parentLayout != null ? parentLayout.getTop() : currentView.getTop();
+                                int targetHeight = parentLayout != null ? parentLayout.getHeight() : currentView.getHeight();
                                 int scrollTo = targetTop - (scrollViewHeight / 2) + (targetHeight / 2);
                                 lyricsScrollView.smoothScrollTo(0, Math.max(0, scrollTo));
                             });
@@ -2176,10 +2180,16 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             lyricsScrollRunnable = null;
             lyricLines.clear();
             lyricViews.clear();
+            translationMap.clear();
+            currentTlyricText = null;
             currentHighlightIndex = -1;
             // Update song name label
             if (tvLyricsSongLabel != null) {
                 tvLyricsSongLabel.setText(song.getName() + " - " + song.getArtist());
+            }
+            // Hide translation button until we know if new song has translation
+            if (btnTranslationToggle != null) {
+                btnTranslationToggle.setVisibility(View.GONE);
             }
             // Reload lyrics for new song
             loadLyricsForOverlay(song, tvLyricsTimeRef);
