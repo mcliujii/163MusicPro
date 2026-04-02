@@ -67,7 +67,21 @@ public class AboutActivity extends AppCompatActivity {
         content.addView(makeSpacer(px(4)));
         content.addView(makeText(
                 "适用于小天才手表的网易云音乐播放器。支持在线搜索、播放、下载、收藏、歌词显示、铃声设置等功能。"
-                + "支持扫码登录、短信登录和Cookie登录，可播放VIP音乐。",
+                + "支持扫码登录和Cookie登录，可播放VIP音乐。",
+                0xFFAAAAAA, px(15), false, Gravity.START));
+
+        // Divider
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeDivider());
+
+        // v20260402 update summary (latest)
+        content.addView(makeSpacer(px(8)));
+        content.addView(makeText("v20260402 更新内容", 0xFFFFFFFF, px(18), true, Gravity.START));
+        content.addView(makeSpacer(px(4)));
+        content.addView(makeText(
+                "• 移除不可用功能入口：听歌识曲、短信登录、密码登录\n"
+                + "• 修复歌词页面切歌后歌词不刷新的问题\n"
+                + "• 切歌时歌词页自动加载新歌词并更新歌曲名称",
                 0xFFAAAAAA, px(15), false, Gravity.START));
 
         // Divider

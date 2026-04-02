@@ -73,10 +73,6 @@ public class MoreActivity extends AppCompatActivity {
         btnHistory.setOnClickListener(v ->
                 startActivity(new Intent(this, HistoryActivity.class)));
 
-        TextView btnRecognition = findViewById(R.id.btn_menu_recognition);
-        btnRecognition.setOnClickListener(v ->
-                startActivity(new Intent(this, SongRecognitionActivity.class)));
-
         btnProfile.setOnClickListener(v ->
                 startActivity(new Intent(this, ProfileActivity.class)));
 
