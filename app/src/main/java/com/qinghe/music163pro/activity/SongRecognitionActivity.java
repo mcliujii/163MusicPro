@@ -48,6 +48,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
     private TextView tvStatus;
     private TextView btnListen;
     private TextView btnHum;
+    private TextView btnStop;
     private TextView tvResult;
 
     private volatile boolean isRecording = false;
@@ -113,7 +114,14 @@ public class SongRecognitionActivity extends AppCompatActivity {
 
         addSpacer(root, px(8));
 
-        // Result area
+        // Stop recording button — visible only during recording
+        btnStop = makeTileButton("⏹  停止录音");
+        btnStop.setBackgroundColor(0xFFC62828);
+        btnStop.setVisibility(android.view.View.GONE);
+        btnStop.setOnClickListener(v -> stopRecording());
+        root.addView(btnStop);
+
+        addSpacer(root, px(8));
         tvResult = new TextView(this);
         tvResult.setText("");
         tvResult.setTextColor(0xFFFFFFFF);
@@ -161,6 +169,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
         String modeLabel = humMode ? "哼歌识曲" : "听歌识曲";
         MusicLog.op(TAG, "开始录音", modeLabel);
         setButtonsEnabled(false);
+        btnStop.setVisibility(android.view.View.VISIBLE);
 
         final int[] remaining = {RECORD_SECONDS};
         tvResult.setVisibility(android.view.View.GONE);
@@ -186,12 +195,16 @@ public class SongRecognitionActivity extends AppCompatActivity {
             if (pcm == null || pcm.length == 0) {
                 runOnUiThread(() -> {
                     tvStatus.setText("录音失败，请检查麦克风权限");
+                    btnStop.setVisibility(android.view.View.GONE);
                     setButtonsEnabled(true);
                 });
                 return;
             }
 
-            runOnUiThread(() -> tvStatus.setText("正在识别..."));
+            runOnUiThread(() -> {
+                tvStatus.setText("正在识别...");
+                btnStop.setVisibility(android.view.View.GONE);
+            });
             MusicLog.d(TAG, "录音完成，开始识别 " + modeLabel + " bytes=" + pcm.length);
 
             String cookie = MusicPlayerManager.getInstance().getCookie();
@@ -216,6 +229,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
                 public void onError(String message) {
                     tvStatus.setText("识别失败: " + message);
                     tvResult.setVisibility(android.view.View.GONE);
+                    btnStop.setVisibility(android.view.View.GONE);
                     setButtonsEnabled(true);
                     MusicLog.w(TAG, modeLabel + " 识别失败: " + message);
                 }
@@ -279,6 +293,16 @@ public class SongRecognitionActivity extends AppCompatActivity {
                 audioRecord = null;
             }
             return null;
+        }
+    }
+
+    /** Stop the current recording early and proceed to recognition. */
+    private void stopRecording() {
+        if (isRecording) {
+            isRecording = false;
+            handler.removeCallbacks(countdownRunnable);
+            tvStatus.setText("录音已停止，正在识别...");
+            btnStop.setVisibility(android.view.View.GONE);
         }
     }
 

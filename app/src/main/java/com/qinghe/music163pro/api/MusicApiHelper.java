@@ -988,18 +988,29 @@ public class MusicApiHelper {
      * Get VIP user info including expiry time.
      * (NeteaseCloudMusicApiBackup module/vip_info.js)
      * Endpoint: /api/music-vip-membership/front/vip/info
+     *
+     * @param cookie user cookie
+     * @param userId user ID string (pass "" or null to use the logged-in user from cookie)
+     * @param callback result callback
      */
-    public static void getVipInfo(String cookie, VipInfoCallback callback) {
+    public static void getVipInfo(String cookie, String userId, VipInfoCallback callback) {
         executor.execute(() -> {
             try {
-                MusicLog.op(TAG, "获取VIP信息", null);
+                MusicLog.op(TAG, "获取VIP信息", "userId=" + userId);
                 JSONObject data = new JSONObject();
-                data.put("userId", "");   // empty = current logged-in user
+                data.put("userId", userId != null ? userId : "");
                 String csrfToken = extractCsrfToken(cookie);
                 data.put("csrf_token", csrfToken);
 
                 String response = weapiPost("/api/music-vip-membership/front/vip/info", data.toString(), cookie);
                 JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 200) {
+                    String msg = json.optString("message", json.optString("msg", "获取VIP信息失败: code=" + code));
+                    MusicLog.w(TAG, "获取VIP信息失败: " + msg);
+                    mainHandler.post(() -> callback.onError(msg));
+                    return;
+                }
                 mainHandler.post(() -> callback.onResult(json));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取VIP信息失败", e);

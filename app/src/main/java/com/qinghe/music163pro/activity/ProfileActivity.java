@@ -69,8 +69,15 @@ public class ProfileActivity extends AppCompatActivity {
             public void onResult(JSONObject json) {
                 contentLayout.removeView(tvLoading);
                 displayAccountInfo(json);
+                // Extract userId from account response to pass to VIP info call
+                JSONObject profile = json.optJSONObject("profile");
+                String userId = "";
+                if (profile != null) {
+                    long uid = profile.optLong("userId", 0);
+                    if (uid > 0) userId = String.valueOf(uid);
+                }
                 // Also fetch VIP info separately for reliable expiry time
-                fetchVipInfo(cookie);
+                fetchVipInfo(cookie, userId);
             }
 
             @Override
@@ -82,9 +89,11 @@ public class ProfileActivity extends AppCompatActivity {
 
     /**
      * Fetch VIP info from dedicated endpoint for reliable expiry display.
+     *
+     * @param userId the user's numeric ID (pass "" to use the logged-in user from cookie)
      */
-    private void fetchVipInfo(String cookie) {
-        MusicApiHelper.getVipInfo(cookie, new MusicApiHelper.VipInfoCallback() {
+    private void fetchVipInfo(String cookie, String userId) {
+        MusicApiHelper.getVipInfo(cookie, userId, new MusicApiHelper.VipInfoCallback() {
             @Override
             public void onResult(JSONObject json) {
                 displayVipInfo(json);
