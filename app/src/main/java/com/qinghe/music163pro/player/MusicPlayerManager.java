@@ -97,7 +97,7 @@ public class MusicPlayerManager {
         sourcePlaylistName = null;
         sourcePlaylistTrackCount = 0;
         sourcePlaylistCreator = null;
-        sourcePlaylistCreatorUserId = 0;
+        sourcePlaylistCreatorUserId = -1;
         sourcePlaylistIsLiked = false;
         savePlaybackState();
     }
