@@ -294,15 +294,12 @@ public class SongInfoActivity extends AppCompatActivity {
             public void onResult(JSONObject wikiJson) {
                 contentLayout.removeView(tvWikiLoading);
                 parseSongWiki(wikiJson);
-                // After wiki, fetch dedicated similar songs/playlists
-                fetchSimiSongs();
             }
 
             @Override
             public void onError(String message) {
                 MusicLog.e(TAG, "歌曲百科加载失败: " + message);
                 tvWikiLoading.setText("歌曲百科加载失败");
-                fetchSimiSongs();
             }
         });
     }
@@ -812,91 +809,6 @@ public class SongInfoActivity extends AppCompatActivity {
         }
 
         contentLayout.addView(makeSpacer(px(16)));
-    }
-
-    // ─── Step 4: Fetch similar songs via dedicated API ──────────────────
-
-    private void fetchSimiSongs() {
-        MusicApiHelper.getSimiSong(songId, cookie, new MusicApiHelper.SimiSongCallback() {
-            @Override
-            public void onResult(JSONArray songs) {
-                if (songs.length() > 0) {
-                    contentLayout.addView(makeSpacer(px(6)));
-                    contentLayout.addView(makeDivider());
-                    contentLayout.addView(makeSpacer(px(6)));
-                    addSectionHeader("\uD83C\uDFB6 相似歌曲");
-                    for (int i = 0; i < songs.length(); i++) {
-                        JSONObject song = songs.optJSONObject(i);
-                        if (song == null) continue;
-                        final long sId = song.optLong("id", 0);
-                        final String sName = song.optString("name", "");
-                        String sArtist = "";
-                        JSONArray artists = song.optJSONArray("artists");
-                        if (artists != null && artists.length() > 0) {
-                            sArtist = artists.optJSONObject(0).optString("name", "");
-                        }
-                        if (sName.isEmpty() || sId <= 0) continue;
-                        String display = sArtist.isEmpty() ? sName : sName + " - " + sArtist;
-                        final String fArtist = sArtist;
-                        TextView tv = makeText("\u25B6 " + display, COLOR_ACCENT, px(14), false, Gravity.START);
-                        tv.setPadding(px(4), px(4), px(4), px(4));
-                        tv.setOnClickListener(v -> playSongById(sId, sName, fArtist));
-                        contentLayout.addView(tv);
-                        contentLayout.addView(makeSpacer(px(1)));
-                    }
-                }
-                // After similar songs, fetch similar playlists
-                fetchSimiPlaylists();
-            }
-
-            @Override
-            public void onError(String message) {
-                MusicLog.e(TAG, "获取相似歌曲失败: " + message);
-                fetchSimiPlaylists();
-            }
-        });
-    }
-
-    // ─── Step 5: Fetch similar playlists via dedicated API ──────────────
-
-    private void fetchSimiPlaylists() {
-        MusicApiHelper.getSimiPlaylist(songId, cookie, new MusicApiHelper.SimiPlaylistCallback() {
-            @Override
-            public void onResult(JSONArray playlists) {
-                if (playlists.length() > 0) {
-                    contentLayout.addView(makeSpacer(px(6)));
-                    contentLayout.addView(makeDivider());
-                    contentLayout.addView(makeSpacer(px(6)));
-                    addSectionHeader("\uD83D\uDCCB 相关歌单");
-                    for (int i = 0; i < playlists.length(); i++) {
-                        JSONObject pl = playlists.optJSONObject(i);
-                        if (pl == null) continue;
-                        final long plId = pl.optLong("id", 0);
-                        String plName = pl.optString("name", "");
-                        int playCount = pl.optInt("playCount", 0);
-                        int trackCount = pl.optInt("trackCount", 0);
-                        if (plName.isEmpty() || plId <= 0) continue;
-                        String display = plName;
-                        if (trackCount > 0) {
-                            display += "  (" + trackCount + "首)";
-                        }
-                        if (playCount > 0) {
-                            display += "  \u25B6 " + formatCount(playCount);
-                        }
-                        TextView tv = makeText("\uD83D\uDCCB " + display, COLOR_ACCENT, px(14), false, Gravity.START);
-                        tv.setPadding(px(4), px(4), px(4), px(4));
-                        tv.setOnClickListener(v -> loadAndPlayPlaylist(plId));
-                        contentLayout.addView(tv);
-                        contentLayout.addView(makeSpacer(px(1)));
-                    }
-                }
-            }
-
-            @Override
-            public void onError(String message) {
-                MusicLog.e(TAG, "获取相似歌单失败: " + message);
-            }
-        });
     }
 
     // ── Playback helpers ────────────────────────────────────────────────
