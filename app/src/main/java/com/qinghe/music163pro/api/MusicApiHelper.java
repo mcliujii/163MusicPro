@@ -211,6 +211,16 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface PlaylistActionCallback {
+        void onResult(boolean success);
+        void onError(String message);
+    }
+
+    public interface PlaylistCreateCallback {
+        void onResult(long playlistId, String name);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -373,11 +383,16 @@ public class MusicApiHelper {
                         String name = p.getString("name");
                         int trackCount = p.optInt("trackCount", 0);
                         String creator = "";
+                        long creatorId = 0;
                         JSONObject creatorObj = p.optJSONObject("creator");
                         if (creatorObj != null) {
                             creator = creatorObj.optString("nickname", "");
+                            creatorId = creatorObj.optLong("userId", 0);
                         }
-                        allPlaylists.add(new PlaylistInfo(id, name, trackCount, creator));
+                        boolean subscribed = p.optBoolean("subscribed", false);
+                        int specialType = p.optInt("specialType", 0);
+                        allPlaylists.add(new PlaylistInfo(id, name, trackCount, creator,
+                                creatorId, subscribed, String.valueOf(specialType)));
                     }
 
                     hasMore = plJson.optBoolean("more", false);
@@ -2177,6 +2192,170 @@ public class MusicApiHelper {
             } catch (Exception e) {
                 MusicLog.e(TAG, "哼歌识曲异常", e);
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "识别失败，请重试"));
+            }
+        });
+    }
+
+    // ==================== Playlist Subscribe / Unsubscribe ====================
+
+    /**
+     * Subscribe (collect) or unsubscribe a playlist.
+     * @param subscribe true to subscribe, false to unsubscribe
+     */
+    public static void subscribePlaylist(long playlistId, boolean subscribe, String cookie,
+                                          PlaylistActionCallback callback) {
+        executor.execute(() -> {
+            try {
+                String action = subscribe ? "subscribe" : "unsubscribe";
+                MusicLog.op(TAG, "歌单" + (subscribe ? "收藏" : "取消收藏"), "id=" + playlistId);
+                JSONObject data = new JSONObject();
+                data.put("id", playlistId);
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+                String response = weapiPost("/api/playlist/" + action, data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "歌单收藏操作失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== Playlist Create ====================
+
+    /**
+     * Create a new playlist.
+     * @param name playlist name
+     * @param privacy 0=normal, 10=private
+     */
+    public static void createPlaylist(String name, int privacy, String cookie,
+                                       PlaylistCreateCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "创建歌单", "name=" + name);
+                JSONObject data = new JSONObject();
+                data.put("name", name);
+                data.put("privacy", String.valueOf(privacy));
+                data.put("type", "NORMAL");
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+                String response = weapiPost("/api/playlist/create", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code == 200) {
+                    JSONObject pl = json.optJSONObject("playlist");
+                    long newId = pl != null ? pl.optLong("id", 0) : 0;
+                    String newName = pl != null ? pl.optString("name", name) : name;
+                    mainHandler.post(() -> callback.onResult(newId, newName));
+                } else {
+                    String msg = json.optString("message", "创建失败");
+                    mainHandler.post(() -> callback.onError(msg));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "创建歌单失败: " + name, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== Playlist Delete ====================
+
+    /**
+     * Delete a playlist (completely remove from cloud).
+     */
+    public static void deletePlaylist(long playlistId, String cookie,
+                                       PlaylistActionCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "删除歌单", "id=" + playlistId);
+                JSONObject data = new JSONObject();
+                data.put("ids", "[" + playlistId + "]");
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+                String response = weapiPost("/api/playlist/remove", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "删除歌单失败: " + playlistId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== Add/Remove Tracks to Playlist ====================
+
+    /**
+     * Add or remove tracks from a playlist.
+     * @param op "add" or "del"
+     * @param playlistId target playlist ID
+     * @param trackIds song IDs to add/remove
+     */
+    public static void playlistTracks(String op, long playlistId, long[] trackIds,
+                                       String cookie, PlaylistActionCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "歌单曲目操作", "op=" + op + " pid=" + playlistId);
+                JSONObject data = new JSONObject();
+                data.put("op", op);
+                data.put("pid", playlistId);
+                // Build trackIds JSON array string
+                StringBuilder sb = new StringBuilder("[");
+                for (int i = 0; i < trackIds.length; i++) {
+                    if (i > 0) sb.append(",");
+                    sb.append(trackIds[i]);
+                }
+                sb.append("]");
+                data.put("trackIds", sb.toString());
+                data.put("imme", "true");
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+                String response = weapiPost("/api/playlist/manipulate/tracks", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code == 200) {
+                    mainHandler.post(() -> callback.onResult(true));
+                } else if (code == 512) {
+                    // Retry with duplicated trackIds (NeteaseCloudMusic workaround)
+                    StringBuilder sb2 = new StringBuilder("[");
+                    for (int i = 0; i < trackIds.length; i++) {
+                        if (i > 0) sb2.append(",");
+                        sb2.append(trackIds[i]);
+                    }
+                    for (long tid : trackIds) {
+                        sb2.append(",").append(tid);
+                    }
+                    sb2.append("]");
+                    data.put("trackIds", sb2.toString());
+                    String response2 = weapiPost("/api/playlist/manipulate/tracks", data.toString(), cookie);
+                    JSONObject json2 = new JSONObject(response2);
+                    int code2 = json2.optInt("code", -1);
+                    mainHandler.post(() -> callback.onResult(code2 == 200));
+                } else {
+                    String msg = json.optString("message", "操作失败");
+                    mainHandler.post(() -> callback.onError(msg));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "歌单曲目操作失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    /**
+     * Get UID from cookie (public access for use in activities).
+     */
+    public static void getUid(String cookie, AccountCallback callback) {
+        executor.execute(() -> {
+            try {
+                long uid = extractUidFromCookie(cookie);
+                JSONObject result = new JSONObject();
+                result.put("uid", uid);
+                mainHandler.post(() -> callback.onResult(result));
+            } catch (Exception e) {
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
             }
         });
     }

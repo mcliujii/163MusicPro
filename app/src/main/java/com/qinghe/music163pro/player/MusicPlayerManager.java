@@ -28,6 +28,10 @@ public class MusicPlayerManager {
     private static final String KEY_CURRENT_SONG_JSON = "current_song_json";
     private static final String KEY_PLAYLIST_JSON = "playlist_json";
     private static final String KEY_CURRENT_INDEX = "current_index";
+    private static final String KEY_SOURCE_PLAYLIST_ID = "source_playlist_id";
+    private static final String KEY_SOURCE_PLAYLIST_NAME = "source_playlist_name";
+    private static final String KEY_SOURCE_PLAYLIST_TRACK_COUNT = "source_playlist_track_count";
+    private static final String KEY_SOURCE_PLAYLIST_CREATOR = "source_playlist_creator";
 
     public enum PlayMode {
         LIST_LOOP,      // 列表循环
@@ -538,6 +542,13 @@ public class MusicPlayerManager {
             }
             editor.putString(KEY_PLAYLIST_JSON, playlistArr.toString());
             editor.putInt(KEY_CURRENT_INDEX, currentIndex);
+
+            // Save source playlist info
+            editor.putLong(KEY_SOURCE_PLAYLIST_ID, sourcePlaylistId);
+            editor.putString(KEY_SOURCE_PLAYLIST_NAME, sourcePlaylistName);
+            editor.putInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, sourcePlaylistTrackCount);
+            editor.putString(KEY_SOURCE_PLAYLIST_CREATOR, sourcePlaylistCreator);
+
             editor.apply();
         } catch (Exception e) {
             Log.w(TAG, "Error saving playback state", e);
@@ -580,6 +591,12 @@ public class MusicPlayerManager {
             } else {
                 currentIndex = 0;
             }
+
+            // Restore source playlist info
+            sourcePlaylistId = prefs.getLong(KEY_SOURCE_PLAYLIST_ID, -1);
+            sourcePlaylistName = prefs.getString(KEY_SOURCE_PLAYLIST_NAME, null);
+            sourcePlaylistTrackCount = prefs.getInt(KEY_SOURCE_PLAYLIST_TRACK_COUNT, 0);
+            sourcePlaylistCreator = prefs.getString(KEY_SOURCE_PLAYLIST_CREATOR, null);
 
             return true;
         } catch (Exception e) {
