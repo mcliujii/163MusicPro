@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
@@ -11,18 +12,23 @@ import android.view.WindowManager;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.MusicLog;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -54,6 +60,7 @@ public class SongInfoActivity extends AppCompatActivity {
 
     private LinearLayout contentLayout;
     private TextView tvLoading;
+    private String currentBlockCode = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,8 +112,8 @@ public class SongInfoActivity extends AppCompatActivity {
             public void onResult(JSONObject songDetail) {
                 contentLayout.removeView(tvLoading);
                 displaySongDetail(songDetail);
-                // After detail, fetch wiki
-                fetchSongWiki();
+                // After detail, fetch artist desc (then wiki)
+                fetchArtistDesc();
             }
 
             @Override
@@ -115,7 +122,7 @@ public class SongInfoActivity extends AppCompatActivity {
                 // Still show basic info and continue
                 contentLayout.removeView(tvLoading);
                 displayBasicInfo();
-                fetchSongWiki();
+                fetchArtistDesc();
             }
         });
     }
@@ -287,15 +294,12 @@ public class SongInfoActivity extends AppCompatActivity {
             public void onResult(JSONObject wikiJson) {
                 contentLayout.removeView(tvWikiLoading);
                 parseSongWiki(wikiJson);
-                // After wiki, fetch artist desc
-                fetchArtistDesc();
             }
 
             @Override
             public void onError(String message) {
                 MusicLog.e(TAG, "歌曲百科加载失败: " + message);
                 tvWikiLoading.setText("歌曲百科加载失败");
-                fetchArtistDesc();
             }
         });
     }
@@ -326,6 +330,7 @@ public class SongInfoActivity extends AppCompatActivity {
 
     private void displayBlock(JSONObject block) {
         String blockCode = block.optString("blockCode", "");
+        currentBlockCode = blockCode;
 
         // Get a user-friendly title for the block
         String blockTitle = getBlockTitle(blockCode);
@@ -415,6 +420,10 @@ public class SongInfoActivity extends AppCompatActivity {
      */
     private void displayExtInfo(JSONObject extInfo) {
         try {
+            boolean isSongBlock = currentBlockCode.contains("SIMILAR_SONG")
+                    || currentBlockCode.contains("REC_SONG");
+            boolean isPlaylistBlock = currentBlockCode.contains("PLAYLIST");
+
             // Some extInfo contains songs array
             JSONArray songs = extInfo.optJSONArray("songs");
             if (songs != null) {
@@ -429,7 +438,19 @@ public class SongInfoActivity extends AppCompatActivity {
                     }
                     if (!sName.isEmpty()) {
                         String display = sArtist.isEmpty() ? sName : sName + " - " + sArtist;
-                        contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        if (isSongBlock) {
+                            final long sId = song.optLong("id", 0);
+                            final String fName = sName;
+                            final String fArtist = sArtist;
+                            TextView tv = makeText("▶ " + display, COLOR_ACCENT, px(14), false, Gravity.START);
+                            tv.setPadding(0, px(2), 0, px(2));
+                            if (sId > 0) {
+                                tv.setOnClickListener(v -> playSongById(sId, fName, fArtist));
+                            }
+                            contentLayout.addView(tv);
+                        } else {
+                            contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        }
                         contentLayout.addView(makeSpacer(px(2)));
                     }
                 }
@@ -449,7 +470,18 @@ public class SongInfoActivity extends AppCompatActivity {
                         if (playCount > 0) {
                             display += "  ▶ " + formatCount(playCount);
                         }
-                        contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        if (isPlaylistBlock) {
+                            final long plId = pl.optLong("id", 0);
+                            final String fDisplay = display;
+                            TextView tv = makeText("📋 " + fDisplay, COLOR_ACCENT, px(14), false, Gravity.START);
+                            tv.setPadding(0, px(2), 0, px(2));
+                            if (plId > 0) {
+                                tv.setOnClickListener(v -> loadAndPlayPlaylist(plId));
+                            }
+                            contentLayout.addView(tv);
+                        } else {
+                            contentLayout.addView(makeText("• " + display, COLOR_TEXT_DESC, px(14), false, Gravity.START));
+                        }
                         contentLayout.addView(makeSpacer(px(2)));
                     }
                 }
@@ -610,6 +642,46 @@ public class SongInfoActivity extends AppCompatActivity {
 
         // Only add card if it has children
         if (card.getChildCount() > 0) {
+            // Add click handler for song blocks
+            boolean isSongBlock = currentBlockCode.contains("SIMILAR_SONG")
+                    || currentBlockCode.contains("REC_SONG");
+            boolean isPlaylistBlock = currentBlockCode.contains("PLAYLIST");
+
+            if (isSongBlock) {
+                long resId = resInfo != null ? resInfo.optLong("id", 0) : 0;
+                if (resId <= 0) resId = resource.optLong("id", 0);
+                String resName = resInfo != null ? resInfo.optString("name", "") : "";
+                if (resName.isEmpty() && resUiElement != null) {
+                    JSONObject mt = resUiElement.optJSONObject("mainTitle");
+                    if (mt != null) resName = mt.optString("title", "");
+                }
+                String resArtist = "";
+                if (resInfo != null) {
+                    JSONArray ars = resInfo.optJSONArray("artist");
+                    if (ars != null && ars.length() > 0) {
+                        JSONObject a0 = ars.optJSONObject(0);
+                        if (a0 != null) resArtist = a0.optString("name", "");
+                    }
+                }
+                card.addView(makeSmallLabel("▶ 点击播放"));
+                final long finalId = resId;
+                final String finalName = resName;
+                final String finalArtist = resArtist;
+                if (finalId > 0) {
+                    card.setClickable(true);
+                    card.setOnClickListener(v -> playSongById(finalId, finalName, finalArtist));
+                }
+            } else if (isPlaylistBlock) {
+                long plId = resInfo != null ? resInfo.optLong("id", 0) : 0;
+                if (plId <= 0 && extInfo != null) plId = extInfo.optLong("id", 0);
+                if (plId <= 0) plId = resource.optLong("id", 0);
+                card.addView(makeSmallLabel("📋 点击加入播放列表"));
+                final long finalPlId = plId;
+                if (finalPlId > 0) {
+                    card.setClickable(true);
+                    card.setOnClickListener(v -> loadAndPlayPlaylist(finalPlId));
+                }
+            }
             contentLayout.addView(card);
         }
     }
@@ -649,7 +721,7 @@ public class SongInfoActivity extends AppCompatActivity {
     private void fetchArtistDesc() {
         if (artistId <= 0) {
             MusicLog.d(TAG, "无歌手ID，跳过歌手百科请求");
-            contentLayout.addView(makeSpacer(px(16)));
+            fetchSongWiki();
             return;
         }
 
@@ -670,12 +742,14 @@ public class SongInfoActivity extends AppCompatActivity {
                         + " introduction段数=" + (introduction != null ? introduction.length() : 0));
                 contentLayout.removeView(tvArtistLoading);
                 displayArtistDesc(briefDesc, introduction);
+                fetchSongWiki();
             }
 
             @Override
             public void onError(String message) {
                 MusicLog.e(TAG, "歌手百科获取失败: " + message);
                 tvArtistLoading.setText("歌手详情加载失败: " + message);
+                fetchSongWiki();
             }
         });
     }
@@ -714,6 +788,44 @@ public class SongInfoActivity extends AppCompatActivity {
         }
 
         contentLayout.addView(makeSpacer(px(16)));
+    }
+
+    // ── Playback helpers ────────────────────────────────────────────────
+
+    private void playSongById(long id, String name, String artist) {
+        Song s = new Song(id, name, artist, "");
+        List<Song> list = new ArrayList<>();
+        list.add(s);
+        MusicPlayerManager.getInstance().setPlaylist(list, 0);
+        MusicPlayerManager.getInstance().playCurrent();
+        Intent intent = new Intent(this, MainActivity.class);
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        startActivity(intent);
+        finish();
+    }
+
+    private void loadAndPlayPlaylist(long playlistId) {
+        Toast.makeText(this, "正在加载歌单...", Toast.LENGTH_SHORT).show();
+        MusicApiHelper.getPlaylistDetail(playlistId, cookie, new MusicApiHelper.PlaylistDetailCallback() {
+            @Override
+            public void onResult(List<Song> songs) {
+                if (songs.isEmpty()) {
+                    Toast.makeText(SongInfoActivity.this, "歌单为空", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                MusicPlayerManager.getInstance().setPlaylist(new ArrayList<>(songs), 0);
+                MusicPlayerManager.getInstance().playCurrent();
+                Intent intent = new Intent(SongInfoActivity.this, MainActivity.class);
+                intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                startActivity(intent);
+                finish();
+            }
+
+            @Override
+            public void onError(String message) {
+                Toast.makeText(SongInfoActivity.this, "加载歌单失败: " + message, Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     // ── UI helpers ──────────────────────────────────────────────────────
