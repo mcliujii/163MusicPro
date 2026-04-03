@@ -57,6 +57,12 @@ public class MusicPlayerManager {
     private long currentlyPlayingSongId = -1;
     private Context appContext;
 
+    // Playlist source tracking: set when playing from a playlist
+    private long sourcePlaylistId = -1;
+    private String sourcePlaylistName;
+    private int sourcePlaylistTrackCount;
+    private String sourcePlaylistCreator;
+
     private MusicPlayerManager() {}
 
     public static synchronized MusicPlayerManager getInstance() {
@@ -78,8 +84,36 @@ public class MusicPlayerManager {
         playlist.clear();
         playlist.addAll(songs);
         currentIndex = startIndex;
+        // Clear playlist source when setting a new playlist without source info
+        sourcePlaylistId = -1;
+        sourcePlaylistName = null;
+        sourcePlaylistTrackCount = 0;
+        sourcePlaylistCreator = null;
         savePlaybackState();
     }
+
+    /**
+     * Set playlist with source playlist info (for tracking which playlist is being played).
+     */
+    public void setPlaylistFromSource(List<Song> songs, int startIndex,
+                                       long playlistId, String playlistName,
+                                       int trackCount, String creator) {
+        playlist.clear();
+        playlist.addAll(songs);
+        currentIndex = startIndex;
+        sourcePlaylistId = playlistId;
+        sourcePlaylistName = playlistName;
+        sourcePlaylistTrackCount = trackCount;
+        sourcePlaylistCreator = creator;
+        savePlaybackState();
+    }
+
+    public long getSourcePlaylistId() { return sourcePlaylistId; }
+    public String getSourcePlaylistName() { return sourcePlaylistName; }
+    public int getSourcePlaylistTrackCount() { return sourcePlaylistTrackCount; }
+    public String getSourcePlaylistCreator() { return sourcePlaylistCreator; }
+
+    public boolean hasSourcePlaylist() { return sourcePlaylistId > 0; }
 
     public List<Song> getPlaylist() {
         return playlist;

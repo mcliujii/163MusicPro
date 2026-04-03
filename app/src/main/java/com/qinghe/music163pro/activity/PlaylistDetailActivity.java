@@ -38,6 +38,11 @@ public class PlaylistDetailActivity extends AppCompatActivity {
     private MusicPlayerManager playerManager;
     private PlaylistManager playlistManager;
     private TextView tvStatus;
+    private TextView btnFav;
+    private long playlistId;
+    private String playlistName;
+    private int trackCount;
+    private String creator;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,10 +53,10 @@ public class PlaylistDetailActivity extends AppCompatActivity {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        long playlistId = getIntent().getLongExtra("playlist_id", 0);
-        String playlistName = getIntent().getStringExtra("playlist_name");
-        int trackCount = getIntent().getIntExtra("track_count", 0);
-        String creator = getIntent().getStringExtra("creator");
+        playlistId = getIntent().getLongExtra("playlist_id", 0);
+        playlistName = getIntent().getStringExtra("playlist_name");
+        trackCount = getIntent().getIntExtra("track_count", 0);
+        creator = getIntent().getStringExtra("creator");
 
         playerManager = MusicPlayerManager.getInstance();
         playlistManager = new PlaylistManager();
@@ -60,6 +65,11 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(0xFF212121);
         root.setPadding(px(6), px(6), px(6), px(6));
+
+        // Title row with heart button on the right
+        android.widget.RelativeLayout titleRow = new android.widget.RelativeLayout(this);
+        titleRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
         // Title
         TextView title = new TextView(this);
@@ -71,27 +81,33 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
         title.setGravity(Gravity.CENTER);
-        title.setPadding(0, 0, 0, px(4));
+        title.setPadding(px(28), 0, px(28), px(4));
         title.setSingleLine(true);
         title.setEllipsize(android.text.TextUtils.TruncateAt.END);
-        root.addView(title);
+        android.widget.RelativeLayout.LayoutParams titleParams = new android.widget.RelativeLayout.LayoutParams(
+                android.widget.RelativeLayout.LayoutParams.MATCH_PARENT,
+                android.widget.RelativeLayout.LayoutParams.WRAP_CONTENT);
+        titleParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        title.setLayoutParams(titleParams);
+        titleRow.addView(title);
 
-        // Long press title to save/remove from local playlists
-        title.setOnLongClickListener(v -> {
-            if (playlistId <= 0) return false;
-            boolean saved = playlistManager.isPlaylistSaved(playlistId);
-            if (saved) {
-                playlistManager.removePlaylist(playlistId);
-                Toast.makeText(this, "已取消收藏歌单", Toast.LENGTH_SHORT).show();
-            } else {
-                PlaylistInfo info = new PlaylistInfo(playlistId,
-                        playlistName != null ? playlistName : "",
-                        trackCount, creator != null ? creator : "");
-                playlistManager.addPlaylist(info);
-                Toast.makeText(this, "已收藏歌单", Toast.LENGTH_SHORT).show();
-            }
-            return true;
-        });
+        // Heart button (top-right)
+        btnFav = new TextView(this);
+        btnFav.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
+        btnFav.setGravity(Gravity.CENTER);
+        btnFav.setPadding(px(4), 0, px(4), 0);
+        btnFav.setClickable(true);
+        btnFav.setFocusable(true);
+        android.widget.RelativeLayout.LayoutParams favParams = new android.widget.RelativeLayout.LayoutParams(
+                px(28), px(28));
+        favParams.addRule(android.widget.RelativeLayout.ALIGN_PARENT_END);
+        favParams.addRule(android.widget.RelativeLayout.CENTER_VERTICAL);
+        btnFav.setLayoutParams(favParams);
+        updateFavButton();
+        btnFav.setOnClickListener(v -> togglePlaylistFav());
+        titleRow.addView(btnFav);
+
+        root.addView(titleRow);
 
         // Status text
         tvStatus = new TextView(this);
@@ -132,7 +148,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         lvSongs.setOnItemClickListener((parent, view, position, id) -> {
             Song song = displayList.get(position);
             List<Song> playlist = new ArrayList<>(displayList);
-            playerManager.setPlaylist(playlist, position);
+            playerManager.setPlaylistFromSource(playlist, position,
+                    playlistId, playlistName, trackCount, creator);
             playerManager.playCurrent();
             Intent intent = new Intent(this, MainActivity.class);
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
@@ -166,6 +183,32 @@ public class PlaylistDetailActivity extends AppCompatActivity {
                 tvStatus.setText("加载失败: " + message);
             }
         });
+    }
+
+    private void updateFavButton() {
+        if (playlistId <= 0) {
+            btnFav.setVisibility(View.GONE);
+            return;
+        }
+        boolean saved = playlistManager.isPlaylistSaved(playlistId);
+        btnFav.setText(saved ? "\u2665" : "\u2661");
+        btnFav.setTextColor(saved ? 0xFFFF4444 : 0xFFAAAAAA);
+    }
+
+    private void togglePlaylistFav() {
+        if (playlistId <= 0) return;
+        boolean saved = playlistManager.isPlaylistSaved(playlistId);
+        if (saved) {
+            playlistManager.removePlaylist(playlistId);
+            Toast.makeText(this, "已取消收藏歌单", Toast.LENGTH_SHORT).show();
+        } else {
+            PlaylistInfo info = new PlaylistInfo(playlistId,
+                    playlistName != null ? playlistName : "",
+                    trackCount, creator != null ? creator : "");
+            playlistManager.addPlaylist(info);
+            Toast.makeText(this, "已收藏歌单", Toast.LENGTH_SHORT).show();
+        }
+        updateFavButton();
     }
 
     private int px(int baseValue) {

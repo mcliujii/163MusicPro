@@ -67,6 +67,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private boolean isUserSeeking = false;
     private boolean serviceStarted = false;
 
+    // Playlist indicator (top-left)
+    private TextView btnPlaylistIndicator;
+
     // Functions overlay
     private FrameLayout overlayContainer;
     private Handler overlayTimerHandler;
@@ -126,6 +129,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         TextView btnVolDown = findViewById(R.id.btn_vol_down);
         TextView btnVolUp = findViewById(R.id.btn_vol_up);
         TextView btnMore = findViewById(R.id.btn_more);
+        btnPlaylistIndicator = findViewById(R.id.btn_playlist_indicator);
 
         playerManager = MusicPlayerManager.getInstance();
         playerManager.setContext(this);
@@ -225,6 +229,18 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         btnMore.setOnClickListener(v ->
                 startActivity(new Intent(MainActivity.this, MoreActivity.class)));
+
+        // Playlist indicator: click to open playlist detail
+        btnPlaylistIndicator.setOnClickListener(v -> {
+            if (playerManager.hasSourcePlaylist()) {
+                Intent plIntent = new Intent(MainActivity.this, PlaylistDetailActivity.class);
+                plIntent.putExtra("playlist_id", playerManager.getSourcePlaylistId());
+                plIntent.putExtra("playlist_name", playerManager.getSourcePlaylistName());
+                plIntent.putExtra("track_count", playerManager.getSourcePlaylistTrackCount());
+                plIntent.putExtra("creator", playerManager.getSourcePlaylistCreator());
+                startActivity(plIntent);
+            }
+        });
 
         playerManager.setCallback(this);
 
@@ -2168,6 +2184,18 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnPlay.setText(playerManager.isPlaying() ? "\u23F8" : "\u25B6");
         // btnFuncMore always shows "more" icon
         btnFuncMore.setText("⋯");
+        // Update playlist indicator visibility
+        updatePlaylistIndicator();
+    }
+
+    private void updatePlaylistIndicator() {
+        if (btnPlaylistIndicator != null) {
+            if (playerManager.hasSourcePlaylist()) {
+                btnPlaylistIndicator.setVisibility(View.VISIBLE);
+            } else {
+                btnPlaylistIndicator.setVisibility(View.GONE);
+            }
+        }
     }
 
     @Override
