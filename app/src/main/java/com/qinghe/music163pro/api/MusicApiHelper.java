@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.api;
 
+import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.util.MusicLog;
 
@@ -200,6 +201,16 @@ public class MusicApiHelper {
         void onError(String message);
     }
 
+    public interface SearchPlaylistCallback {
+        void onResult(List<PlaylistInfo> playlists);
+        void onError(String message);
+    }
+
+    public interface UserPlaylistsCallback {
+        void onResult(List<PlaylistInfo> playlists);
+        void onError(String message);
+    }
+
     // ==================== Search ====================
 
     public static void searchSongs(String keyword, String cookie, SearchCallback callback) {
@@ -266,6 +277,120 @@ public class MusicApiHelper {
             }
         }
         return songs;
+    }
+
+    // ==================== Search Playlists ====================
+
+    /**
+     * Search playlists via cloudsearch (type=1000).
+     * Supports pagination with offset.
+     */
+    public static void searchPlaylists(String keyword, int offset, String cookie, SearchPlaylistCallback callback) {
+        executor.execute(() -> {
+            try {
+                MusicLog.op(TAG, "搜索歌单", "keyword=" + keyword + " offset=" + offset);
+                JSONObject data = new JSONObject();
+                data.put("s", keyword);
+                data.put("type", 1000);  // 1000 = playlists
+                data.put("limit", 20);
+                data.put("offset", offset);
+                data.put("total", true);
+
+                String csrfToken = extractCsrfToken(cookie);
+                data.put("csrf_token", csrfToken);
+
+                String response = weapiPost("/api/cloudsearch/pc", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                List<PlaylistInfo> playlists = new ArrayList<>();
+                JSONObject result = json.optJSONObject("result");
+                if (result != null) {
+                    JSONArray playlistsArray = result.optJSONArray("playlists");
+                    if (playlistsArray != null) {
+                        for (int i = 0; i < playlistsArray.length(); i++) {
+                            JSONObject p = playlistsArray.getJSONObject(i);
+                            long id = p.getLong("id");
+                            String name = p.getString("name");
+                            int trackCount = p.optInt("trackCount", 0);
+                            String creator = "";
+                            JSONObject creatorObj = p.optJSONObject("creator");
+                            if (creatorObj != null) {
+                                creator = creatorObj.optString("nickname", "");
+                            }
+                            playlists.add(new PlaylistInfo(id, name, trackCount, creator));
+                        }
+                    }
+                }
+                MusicLog.d(TAG, "搜索歌单结果: " + playlists.size() + " 个");
+                mainHandler.post(() -> callback.onResult(playlists));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "搜索歌单失败: " + keyword, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== User Playlists ====================
+
+    /**
+     * Get user's playlists from the cloud.
+     * Returns all playlists (created + subscribed).
+     */
+    public static void getUserPlaylists(String cookie, UserPlaylistsCallback callback) {
+        executor.execute(() -> {
+            try {
+                long uid = extractUidFromCookie(cookie);
+                if (uid <= 0) {
+                    mainHandler.post(() -> callback.onError("请先登录"));
+                    return;
+                }
+                MusicLog.op(TAG, "获取用户歌单", "uid=" + uid);
+
+                String csrfToken = extractCsrfToken(cookie);
+                List<PlaylistInfo> allPlaylists = new ArrayList<>();
+
+                // Fetch playlists in pages
+                int offset = 0;
+                int limit = 50;
+                boolean hasMore = true;
+                while (hasMore) {
+                    JSONObject plData = new JSONObject();
+                    plData.put("uid", uid);
+                    plData.put("limit", limit);
+                    plData.put("offset", offset);
+                    plData.put("csrf_token", csrfToken);
+
+                    String plResponse = weapiPost("/api/user/playlist", plData.toString(), cookie);
+                    JSONObject plJson = new JSONObject(plResponse);
+                    JSONArray playlists = plJson.optJSONArray("playlist");
+
+                    if (playlists == null || playlists.length() == 0) {
+                        break;
+                    }
+
+                    for (int i = 0; i < playlists.length(); i++) {
+                        JSONObject p = playlists.getJSONObject(i);
+                        long id = p.getLong("id");
+                        String name = p.getString("name");
+                        int trackCount = p.optInt("trackCount", 0);
+                        String creator = "";
+                        JSONObject creatorObj = p.optJSONObject("creator");
+                        if (creatorObj != null) {
+                            creator = creatorObj.optString("nickname", "");
+                        }
+                        allPlaylists.add(new PlaylistInfo(id, name, trackCount, creator));
+                    }
+
+                    hasMore = plJson.optBoolean("more", false);
+                    offset += playlists.length();
+                }
+
+                MusicLog.d(TAG, "用户歌单: " + allPlaylists.size() + " 个");
+                mainHandler.post(() -> callback.onResult(allPlaylists));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取用户歌单失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
     }
 
     // ==================== Song URL ====================
@@ -837,10 +962,11 @@ public class MusicApiHelper {
 
                 long likedPlaylistId = playlists.getJSONObject(0).getLong("id");
 
-                // Step 2: Get playlist tracks in correct time order
+                // Step 2: Get playlist detail - tracks array is limited to ~n tracks,
+                // but trackIds contains ALL song IDs. Use trackIds to fetch all songs.
                 JSONObject detailData = new JSONObject();
                 detailData.put("id", likedPlaylistId);
-                detailData.put("n", 200);
+                detailData.put("n", 0);  // Don't need full tracks, we'll use trackIds
                 detailData.put("csrf_token", csrfToken);
 
                 String detailResponse = weapiPost("/api/v6/playlist/detail", detailData.toString(), cookie);
@@ -852,30 +978,14 @@ public class MusicApiHelper {
                     return;
                 }
 
-                JSONArray tracks = playlist.optJSONArray("tracks");
-                if (tracks == null || tracks.length() == 0) {
+                JSONArray trackIds = playlist.optJSONArray("trackIds");
+                if (trackIds == null || trackIds.length() == 0) {
                     mainHandler.post(() -> callback.onResult(new ArrayList<>()));
                     return;
                 }
 
-                List<Song> songs = new ArrayList<>();
-                int limit = Math.min(tracks.length(), 200);
-                for (int i = 0; i < limit; i++) {
-                    JSONObject s = tracks.getJSONObject(i);
-                    long id = s.getLong("id");
-                    String name = s.getString("name");
-                    String artist = "";
-                    JSONArray ar = s.optJSONArray("ar");
-                    if (ar != null && ar.length() > 0) {
-                        artist = ar.getJSONObject(0).optString("name", "");
-                    }
-                    String album = "";
-                    JSONObject al = s.optJSONObject("al");
-                    if (al != null) {
-                        album = al.optString("name", "");
-                    }
-                    songs.add(new Song(id, name, artist, album));
-                }
+                // Fetch song details in batches of 200 using trackIds
+                List<Song> songs = fetchSongDetailsByTrackIds(trackIds, csrfToken, cookie);
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取云端收藏失败", e);
@@ -904,23 +1014,88 @@ public class MusicApiHelper {
                 return;
             }
 
-            int limit = Math.min(idsArray.length(), 200);
-            JSONArray songIds = new JSONArray();
-            for (int i = 0; i < limit; i++) {
+            // Fetch all songs in batches of 200
+            int total = idsArray.length();
+            java.util.Map<Long, Song> songMap = new java.util.LinkedHashMap<>();
+            for (int batchStart = 0; batchStart < total; batchStart += 200) {
+                int batchEnd = Math.min(batchStart + 200, total);
+                JSONArray songIds = new JSONArray();
+                for (int i = batchStart; i < batchEnd; i++) {
+                    JSONObject idObj = new JSONObject();
+                    idObj.put("id", idsArray.getLong(i));
+                    songIds.put(idObj);
+                }
+
+                JSONObject detailData = new JSONObject();
+                detailData.put("c", songIds.toString());
+                detailData.put("csrf_token", csrfToken);
+
+                String detailResponse = weapiPost("/api/v3/song/detail", detailData.toString(), cookie);
+                JSONObject detailJson = new JSONObject(detailResponse);
+                JSONArray songsArray = detailJson.optJSONArray("songs");
+
+                if (songsArray != null) {
+                    for (int i = 0; i < songsArray.length(); i++) {
+                        JSONObject s = songsArray.getJSONObject(i);
+                        long id = s.getLong("id");
+                        String name = s.getString("name");
+                        String artist = "";
+                        JSONArray ar = s.optJSONArray("ar");
+                        if (ar != null && ar.length() > 0) {
+                            artist = ar.getJSONObject(0).optString("name", "");
+                        }
+                        String album = "";
+                        JSONObject al = s.optJSONObject("al");
+                        if (al != null) {
+                            album = al.optString("name", "");
+                        }
+                        songMap.put(id, new Song(id, name, artist, album));
+                    }
+                }
+            }
+
+            List<Song> songs = new ArrayList<>();
+            for (int i = 0; i < total; i++) {
+                long id = idsArray.getLong(i);
+                Song song = songMap.get(id);
+                if (song != null) {
+                    songs.add(song);
+                }
+            }
+            mainHandler.post(() -> callback.onResult(songs));
+        } catch (Exception e) {
+            MusicLog.w(TAG, "获取云端收藏(legacy)失败", e);
+            mainHandler.post(() -> callback.onError("获取云端收藏失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误")));
+        }
+    }
+
+    /**
+     * Fetch song details in batches of 200 using trackIds from a playlist.
+     * trackIds is a JSONArray of objects with at least an "id" field.
+     * Returns songs in the same order as trackIds.
+     */
+    private static List<Song> fetchSongDetailsByTrackIds(JSONArray trackIds, String csrfToken, String cookie) throws Exception {
+        int total = trackIds.length();
+        java.util.Map<Long, Song> songMap = new java.util.LinkedHashMap<>();
+
+        for (int batchStart = 0; batchStart < total; batchStart += 200) {
+            int batchEnd = Math.min(batchStart + 200, total);
+            JSONArray batchIds = new JSONArray();
+            for (int i = batchStart; i < batchEnd; i++) {
                 JSONObject idObj = new JSONObject();
-                idObj.put("id", idsArray.getLong(i));
-                songIds.put(idObj);
+                long songId = trackIds.getJSONObject(i).getLong("id");
+                idObj.put("id", songId);
+                batchIds.put(idObj);
             }
 
             JSONObject detailData = new JSONObject();
-            detailData.put("c", songIds.toString());
+            detailData.put("c", batchIds.toString());
             detailData.put("csrf_token", csrfToken);
 
             String detailResponse = weapiPost("/api/v3/song/detail", detailData.toString(), cookie);
             JSONObject detailJson = new JSONObject(detailResponse);
             JSONArray songsArray = detailJson.optJSONArray("songs");
 
-            java.util.Map<Long, Song> songMap = new java.util.LinkedHashMap<>();
             if (songsArray != null) {
                 for (int i = 0; i < songsArray.length(); i++) {
                     JSONObject s = songsArray.getJSONObject(i);
@@ -939,20 +1114,18 @@ public class MusicApiHelper {
                     songMap.put(id, new Song(id, name, artist, album));
                 }
             }
-
-            List<Song> songs = new ArrayList<>();
-            for (int i = 0; i < limit; i++) {
-                long id = idsArray.getLong(i);
-                Song song = songMap.get(id);
-                if (song != null) {
-                    songs.add(song);
-                }
-            }
-            mainHandler.post(() -> callback.onResult(songs));
-        } catch (Exception e) {
-            MusicLog.w(TAG, "获取云端收藏(legacy)失败", e);
-            mainHandler.post(() -> callback.onError("获取云端收藏失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误")));
         }
+
+        // Preserve original order from trackIds
+        List<Song> result = new ArrayList<>();
+        for (int i = 0; i < total; i++) {
+            long id = trackIds.getJSONObject(i).getLong("id");
+            Song song = songMap.get(id);
+            if (song != null) {
+                result.add(song);
+            }
+        }
+        return result;
     }
 
     /**
@@ -1101,7 +1274,7 @@ public class MusicApiHelper {
             try {
                 JSONObject data = new JSONObject();
                 data.put("id", playlistId);
-                data.put("n", 200);
+                data.put("n", 0);  // Don't need full tracks in response, we'll use trackIds
                 String csrfToken = extractCsrfToken(cookie);
                 data.put("csrf_token", csrfToken);
 
@@ -1113,27 +1286,14 @@ public class MusicApiHelper {
                     return;
                 }
 
-                JSONArray tracks = playlist.optJSONArray("tracks");
-                List<Song> songs = new ArrayList<>();
-                if (tracks != null) {
-                    int limit = Math.min(tracks.length(), 200);
-                    for (int i = 0; i < limit; i++) {
-                        JSONObject s = tracks.getJSONObject(i);
-                        long id = s.getLong("id");
-                        String name = s.getString("name");
-                        String artist = "";
-                        JSONArray ar = s.optJSONArray("ar");
-                        if (ar != null && ar.length() > 0) {
-                            artist = ar.getJSONObject(0).optString("name", "");
-                        }
-                        String album = "";
-                        JSONObject al = s.optJSONObject("al");
-                        if (al != null) {
-                            album = al.optString("name", "");
-                        }
-                        songs.add(new Song(id, name, artist, album));
-                    }
+                JSONArray trackIds = playlist.optJSONArray("trackIds");
+                if (trackIds == null || trackIds.length() == 0) {
+                    mainHandler.post(() -> callback.onResult(new ArrayList<>()));
+                    return;
                 }
+
+                // Fetch all song details in batches using trackIds
+                List<Song> songs = fetchSongDetailsByTrackIds(trackIds, csrfToken, cookie);
                 mainHandler.post(() -> callback.onResult(songs));
             } catch (Exception e) {
                 MusicLog.w(TAG, "获取歌单详情失败: " + playlistId, e);
