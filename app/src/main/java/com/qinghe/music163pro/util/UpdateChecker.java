@@ -61,20 +61,27 @@ public class UpdateChecker {
                 conn.setReadTimeout(10000);
 
                 byte[] body = ("{\"version\":" + vc + "}").getBytes(Charset.forName("UTF-8"));
-                OutputStream os = conn.getOutputStream();
-                os.write(body);
-                os.flush();
+                OutputStream reqOs = conn.getOutputStream();
+                try {
+                    reqOs.write(body);
+                    reqOs.flush();
+                } finally {
+                    reqOs.close();
+                }
 
                 int code = conn.getResponseCode();
                 if (code == 200) {
                     InputStream is = conn.getInputStream();
                     StringBuilder sb = new StringBuilder();
-                    byte[] buf = new byte[1024];
-                    int n;
-                    while ((n = is.read(buf)) != -1) {
-                        sb.append(new String(buf, 0, n, Charset.forName("UTF-8")));
+                    try {
+                        byte[] buf = new byte[1024];
+                        int n;
+                        while ((n = is.read(buf)) != -1) {
+                            sb.append(new String(buf, 0, n, Charset.forName("UTF-8")));
+                        }
+                    } finally {
+                        is.close();
                     }
-                    is.close();
                     JSONObject resp = new JSONObject(sb.toString());
                     boolean isLatest = resp.getJSONObject("data").getBoolean("is_latest");
                     mainHandler.post(() -> callback.onResult(isLatest));
@@ -109,24 +116,27 @@ public class UpdateChecker {
                 InputStream is = new BufferedInputStream(conn.getInputStream());
                 OutputStream os = new FileOutputStream(savePath);
 
-                byte[] buf = new byte[4096];
-                int bytesRead;
-                long totalRead = 0;
-                int lastPercent = -1;
-                while ((bytesRead = is.read(buf)) != -1) {
-                    os.write(buf, 0, bytesRead);
-                    totalRead += bytesRead;
-                    if (totalLength > 0) {
-                        int percent = (int) (totalRead * 100L / totalLength);
-                        if (percent != lastPercent) {
-                            lastPercent = percent;
-                            final int p = percent;
-                            mainHandler.post(() -> callback.onProgress(p));
+                try {
+                    byte[] buf = new byte[4096];
+                    int bytesRead;
+                    long totalRead = 0;
+                    int lastPercent = -1;
+                    while ((bytesRead = is.read(buf)) != -1) {
+                        os.write(buf, 0, bytesRead);
+                        totalRead += bytesRead;
+                        if (totalLength > 0) {
+                            int percent = (int) (totalRead * 100L / totalLength);
+                            if (percent != lastPercent) {
+                                lastPercent = percent;
+                                final int p = percent;
+                                mainHandler.post(() -> callback.onProgress(p));
+                            }
                         }
                     }
+                } finally {
+                    os.close();
+                    is.close();
                 }
-                os.close();
-                is.close();
                 final String path = savePath;
                 mainHandler.post(() -> callback.onComplete(path));
             } catch (Exception e) {

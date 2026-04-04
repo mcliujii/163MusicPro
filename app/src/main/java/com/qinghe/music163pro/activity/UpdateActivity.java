@@ -156,7 +156,14 @@ public class UpdateActivity extends AppCompatActivity {
 
         // Ensure output directory exists
         File dir = new File(Environment.getExternalStorageDirectory(), "163Music");
-        if (!dir.exists()) dir.mkdirs();
+        if (!dir.exists() && !dir.mkdirs()) {
+            Toast.makeText(this, "无法创建下载目录", Toast.LENGTH_SHORT).show();
+            downloading = false;
+            btnUpdate.setEnabled(true);
+            btnUpdate.setText("更新");
+            btnUpdate.setBackgroundColor(0xFFD32F2F);
+            return;
+        }
 
         UpdateChecker.downloadUpdate(APK_SAVE_PATH, new UpdateChecker.DownloadCallback() {
             @Override
