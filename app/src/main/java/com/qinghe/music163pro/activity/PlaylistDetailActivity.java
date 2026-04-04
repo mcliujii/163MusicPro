@@ -244,22 +244,20 @@ public class PlaylistDetailActivity extends AppCompatActivity {
             return true;
         });
 
-        // Get current user ID for cloud mode rules
-        if (isCloudMode) {
-            String cookie = playerManager.getCookie();
-            if (cookie != null && !cookie.isEmpty()) {
-                MusicApiHelper.getUid(cookie, new MusicApiHelper.AccountCallback() {
-                    @Override
-                    public void onResult(JSONObject json) {
-                        currentUserId = json.optLong("uid", -1);
-                        updateActionButtons();
-                    }
-                    @Override
-                    public void onError(String message) {
-                        updateActionButtons();
-                    }
-                });
-            }
+        // Always get current user ID for playlist type identification (liked/created/others')
+        String cookie = playerManager.getCookie();
+        if (cookie != null && !cookie.isEmpty()) {
+            MusicApiHelper.getUid(cookie, new MusicApiHelper.AccountCallback() {
+                @Override
+                public void onResult(JSONObject json) {
+                    currentUserId = json.optLong("uid", -1);
+                    updateActionButtons();
+                }
+                @Override
+                public void onError(String message) {
+                    updateActionButtons();
+                }
+            });
         }
 
         updateFavButton();
@@ -329,32 +327,22 @@ public class PlaylistDetailActivity extends AppCompatActivity {
     }
 
     /**
-     * Update button visibility based on mode and ownership rules:
-     * Cloud mode:
+     * Update button visibility based on playlist type (always identified regardless of mode):
      *   - "我喜欢的音乐" (specialType=5) → no unsub, no delete
      *   - My created playlist → no unsub, can delete
-     *   - Others' playlist → can sub/unsub, no delete
-     * Local mode:
-     *   - All playlists → can unsub (local remove), no delete
+     *   - Others' playlist → can sub/unsub (cloud) or local save/remove, no delete
      */
     private void updateActionButtons() {
-        if (isCloudMode) {
-            if (isLikedPlaylist) {
-                // "我喜欢的音乐" - cannot unsub or delete
-                btnFav.setVisibility(View.GONE);
-                btnDelete.setVisibility(View.GONE);
-            } else if (creatorUserId > 0 && creatorUserId == currentUserId) {
-                // My created playlist - cannot unsub but can delete
-                btnFav.setVisibility(View.GONE);
-                btnDelete.setVisibility(View.VISIBLE);
-            } else {
-                // Others' playlist - can sub/unsub but cannot delete
-                btnFav.setVisibility(View.VISIBLE);
-                btnDelete.setVisibility(View.GONE);
-                updateFavButton();
-            }
+        if (isLikedPlaylist) {
+            // "我喜欢的音乐" - cannot unsub or delete
+            btnFav.setVisibility(View.GONE);
+            btnDelete.setVisibility(View.GONE);
+        } else if (creatorUserId > 0 && creatorUserId == currentUserId) {
+            // My created playlist - cannot unsub but can delete
+            btnFav.setVisibility(View.GONE);
+            btnDelete.setVisibility(View.VISIBLE);
         } else {
-            // Local mode: can unsub all, no delete
+            // Others' playlist - can sub/unsub or local save/remove, cannot delete
             btnFav.setVisibility(View.VISIBLE);
             btnDelete.setVisibility(View.GONE);
             updateFavButton();
