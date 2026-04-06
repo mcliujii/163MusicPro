@@ -1,6 +1,33 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="colorPrimary">#FFD32F2F</color>
+    <!-- Material Design 3 Color Scheme - Red (网易云红) -->
+    <color name="md_theme_primary">#FFDD2D2D</color>
+    <color name="md_theme_onPrimary">#FFFFFFFF</color>
+    <color name="md_theme_primaryContainer">#FFFFDAD6</color>
+    <color name="md_theme_onPrimaryContainer">#FF410002</color>
+    <color name="md_theme_secondary">#FF765857</color>
+    <color name="md_theme_onSecondary">#FFFFFFFF</color>
+    <color name="md_theme_secondaryContainer">#FFFFDAD6</color>
+    <color name="md_theme_onSecondaryContainer">#FF2B1512</color>
+    <color name="md_theme_tertiary">#FF735C2F</color>
+    <color name="md_theme_onTertiary">#FFFFFFFF</color>
+    <color name="md_theme_tertiaryContainer">#FFFFDFBB</color>
+    <color name="md_theme_onTertiaryContainer">#FF271900</color>
+    <color name="md_theme_error">#FFBA1A1A</color>
+    <color name="md_theme_onError">#FFFFFFFF</color>
+    <color name="md_theme_errorContainer">#FFFFDAD6</color>
+    <color name="md_theme_onErrorContainer">#FF410002</color>
+    <color name="md_theme_background">#FF1A1C1E</color>
+    <color name="md_theme_onBackground">#FFE3E2E6</color>
+    <color name="md_theme_surface">#FF1A1C1E</color>
+    <color name="md_theme_onSurface">#FFE3E2E6</color>
+    <color name="md_theme_surfaceVariant">#FF514341</color>
+    <color name="md_theme_onSurfaceVariant">#FFD7C1BF</color>
+    <color name="md_theme_outline">#FFA08C8A</color>
+    <color name="md_theme_outlineVariant">#FF514341</color>
+
+    <!-- Legacy colors (for compatibility) -->
+    <color name="colorPrimary">#FFDD2D2D</color>
     <color name="colorPrimaryDark">#FFB71C1C</color>
     <color name="colorAccent">#FFFF5252</color>
     <color name="white">#FFFFFFFF</color>
