@@ -49,7 +49,7 @@ public class MyPlaylistsActivity extends AppCompatActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF212121);
+        root.setBackgroundColor(0xFF121212);
         root.setPadding(px(6), px(6), px(6), px(6));
 
         // Title row with "+" button
@@ -93,7 +93,7 @@ public class MyPlaylistsActivity extends AppCompatActivity {
         // Status text
         tvStatus = new TextView(this);
         tvStatus.setText("正在加载...");
-        tvStatus.setTextColor(0xFFAAAAAA);
+        tvStatus.setTextColor(0x80FFFFFF);
         tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tvStatus.setGravity(Gravity.CENTER);
         tvStatus.setPadding(0, px(4), 0, px(4));
@@ -121,11 +121,11 @@ public class MyPlaylistsActivity extends AppCompatActivity {
                     TextView text2 = view.findViewById(android.R.id.text2);
                     String prefix = "";
                     if (pl.isLikedPlaylist()) {
-                        prefix = "♥ ";
+                        prefix = "";
                     } else if (pl.getUserId() == currentUserId) {
                         prefix = "📝 ";
                     } else {
-                        prefix = "📋 ";
+                        prefix = "";
                     }
                     text1.setText(prefix + pl.getName());
                     text1.setTextColor(0xFFFFFFFF);
@@ -138,7 +138,7 @@ public class MyPlaylistsActivity extends AppCompatActivity {
                         detail += " · " + pl.getCreator();
                     }
                     text2.setText(detail);
-                    text2.setTextColor(0xFF888888);
+                    text2.setTextColor(0xB3FFFFFF);
                     text2.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
                 }
                 view.setBackgroundColor(0xFF2A2A2A);

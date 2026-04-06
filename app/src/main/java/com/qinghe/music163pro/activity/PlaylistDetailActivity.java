@@ -9,6 +9,7 @@ import android.view.ViewGroup;
 import android.view.WindowManager;
 import android.widget.ArrayAdapter;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -47,8 +48,8 @@ public class PlaylistDetailActivity extends AppCompatActivity {
     private TextView tvStatus;
     private TextView tvTitle;
     private TextView tvCreatorLabel;
-    private TextView btnFav;
-    private TextView btnDelete;
+    private ImageView btnFav;
+    private ImageView btnDelete;
     private long playlistId;
     private String playlistName;
     private int trackCount;
@@ -81,7 +82,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
 
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setBackgroundColor(0xFF212121);
+        root.setBackgroundColor(0xFF121212);
         root.setPadding(px(6), px(6), px(6), px(6));
 
         // Title row with heart + delete buttons on the right
@@ -105,12 +106,10 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         tvTitle.setLayoutParams(titleParams);
         titleRow.addView(tvTitle);
 
-        // Delete button (🗑) - top right
-        btnDelete = new TextView(this);
-        btnDelete.setText("🗑");
-        btnDelete.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
-        btnDelete.setGravity(Gravity.CENTER);
-        btnDelete.setPadding(px(4), 0, px(2), 0);
+        // Delete button - top right
+        btnDelete = new ImageView(this);
+        btnDelete.setImageResource(R.drawable.ic_delete);
+        btnDelete.setPadding(px(4), px(4), px(2), px(4));
         btnDelete.setClickable(true);
         btnDelete.setFocusable(true);
         btnDelete.setId(View.generateViewId());
@@ -123,11 +122,9 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         btnDelete.setOnClickListener(v -> onDeletePlaylist());
         titleRow.addView(btnDelete);
 
-        // Heart button (♡/♥) - left of delete
-        btnFav = new TextView(this);
-        btnFav.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(18));
-        btnFav.setGravity(Gravity.CENTER);
-        btnFav.setPadding(px(2), 0, px(4), 0);
+        // Heart button - left of delete
+        btnFav = new ImageView(this);
+        btnFav.setPadding(px(2), px(4), px(4), px(4));
         btnFav.setClickable(true);
         btnFav.setFocusable(true);
         android.widget.RelativeLayout.LayoutParams favParams = new android.widget.RelativeLayout.LayoutParams(
@@ -142,7 +139,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
 
         // Creator label (always created, visibility depends on data)
         tvCreatorLabel = new TextView(this);
-        tvCreatorLabel.setTextColor(0xFF888888);
+        tvCreatorLabel.setTextColor(0xB3FFFFFF);
         tvCreatorLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(11));
         tvCreatorLabel.setGravity(Gravity.CENTER);
         tvCreatorLabel.setPadding(0, 0, 0, px(2));
@@ -152,7 +149,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         // Status text
         tvStatus = new TextView(this);
         tvStatus.setText("正在加载...");
-        tvStatus.setTextColor(0xFFAAAAAA);
+        tvStatus.setTextColor(0x80FFFFFF);
         tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tvStatus.setGravity(Gravity.CENTER);
         tvStatus.setPadding(0, px(4), 0, px(4));
@@ -351,13 +348,12 @@ public class PlaylistDetailActivity extends AppCompatActivity {
             return;
         }
         if (isCloudMode) {
-            // In cloud mode, show actual subscription state
-            btnFav.setText(isSubscribed ? "\u2665" : "\u2661");
-            btnFav.setTextColor(isSubscribed ? 0xFFFF4444 : 0xFFAAAAAA);
+            btnFav.setImageResource(isSubscribed ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
+            btnFav.setColorFilter(isSubscribed ? 0xFFFF4081 : 0x80FFFFFF);
         } else {
             boolean saved = playlistManager.isPlaylistSaved(playlistId);
-            btnFav.setText(saved ? "\u2665" : "\u2661");
-            btnFav.setTextColor(saved ? 0xFFFF4444 : 0xFFAAAAAA);
+            btnFav.setImageResource(saved ? R.drawable.ic_favorite : R.drawable.ic_favorite_border);
+            btnFav.setColorFilter(saved ? 0xFFFF4081 : 0x80FFFFFF);
         }
     }
 
@@ -472,11 +468,11 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         FrameLayout overlay = new FrameLayout(this);
         overlay.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlay.setBackgroundColor(0xCC333333);
+        overlay.setBackgroundColor(0xCC000000);
 
         LinearLayout dialog = new LinearLayout(this);
         dialog.setOrientation(LinearLayout.VERTICAL);
-        dialog.setBackgroundColor(0xFF424242);
+        dialog.setBackgroundColor(0xFF1E1E1E);
         dialog.setPadding(px(16), px(12), px(16), px(12));
         FrameLayout.LayoutParams dlgParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
@@ -495,7 +491,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
 
         TextView tvMessage = new TextView(this);
         tvMessage.setText(message);
-        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextColor(0xB3FFFFFF);
         tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         tvMessage.setGravity(Gravity.CENTER);
         tvMessage.setPadding(0, 0, 0, px(12));
@@ -512,7 +508,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(px(12), px(8), px(12), px(8));
-        btnCancel.setBackgroundColor(0xFF616161);
+        btnCancel.setBackgroundColor(0xFF2D2D2D);
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         cancelParams.rightMargin = px(4);
@@ -528,7 +524,7 @@ public class PlaylistDetailActivity extends AppCompatActivity {
         btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnConfirm.setGravity(Gravity.CENTER);
         btnConfirm.setPadding(px(12), px(8), px(12), px(8));
-        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        btnConfirm.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         confirmParams.leftMargin = px(4);

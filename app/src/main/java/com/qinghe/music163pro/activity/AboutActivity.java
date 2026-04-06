@@ -32,7 +32,7 @@ public class AboutActivity extends AppCompatActivity {
 
         // Build UI programmatically for DPI adaptation
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF212121);
+        scrollView.setBackgroundColor(0xFF121212);
         scrollView.setFillViewport(true);
 
         LinearLayout content = new LinearLayout(this);
@@ -298,7 +298,7 @@ public class AboutActivity extends AppCompatActivity {
 
     private android.view.View makeDivider() {
         android.view.View divider = new android.view.View(this);
-        divider.setBackgroundColor(0xFF424242);
+        divider.setBackgroundColor(0xFF2D2D2D);
         divider.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, px(1)));
         return divider;

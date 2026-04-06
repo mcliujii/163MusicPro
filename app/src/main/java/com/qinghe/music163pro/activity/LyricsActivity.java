@@ -191,7 +191,7 @@ public class LyricsActivity extends AppCompatActivity {
         for (LyricLine line : lyricLines) {
             TextView tv = new TextView(this);
             tv.setText(line.text);
-            tv.setTextColor(0xFF888888);
+            tv.setTextColor(0xB3FFFFFF);
             tv.setTextSize(13);
             tv.setGravity(android.view.Gravity.CENTER);
             tv.setPadding(0, dp(6), 0, dp(6));
@@ -204,7 +204,7 @@ public class LyricsActivity extends AppCompatActivity {
         llContainer.removeAllViews();
         TextView tv = new TextView(this);
         tv.setText("暂无歌词");
-        tv.setTextColor(0xFF888888);
+        tv.setTextColor(0xB3FFFFFF);
         tv.setTextSize(14);
         tv.setGravity(android.view.Gravity.CENTER);
         tv.setPadding(0, dp(40), 0, 0);
@@ -229,7 +229,7 @@ public class LyricsActivity extends AppCompatActivity {
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
                         // Unhighlight previous
                         if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
-                            lyricViews.get(currentHighlightIndex).setTextColor(0xFF888888);
+                            lyricViews.get(currentHighlightIndex).setTextColor(0xB3FFFFFF);
                             lyricViews.get(currentHighlightIndex).setTextSize(13);
                         }
                         // Highlight current

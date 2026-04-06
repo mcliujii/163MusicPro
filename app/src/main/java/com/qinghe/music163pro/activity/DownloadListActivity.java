@@ -181,7 +181,7 @@ public class DownloadListActivity extends AppCompatActivity {
         FrameLayout overlay = new FrameLayout(this);
         overlay.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlay.setBackgroundColor(0xCC333333);
+        overlay.setBackgroundColor(0xCC000000);
 
         LinearLayout dialog = new LinearLayout(this);
         dialog.setOrientation(LinearLayout.VERTICAL);
@@ -206,7 +206,7 @@ public class DownloadListActivity extends AppCompatActivity {
         // Message
         TextView tvMessage = new TextView(this);
         tvMessage.setText(message);
-        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextColor(0xB3FFFFFF);
         tvMessage.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         tvMessage.setGravity(Gravity.CENTER);
         tvMessage.setPadding(0, 0, 0, px(12));
@@ -225,7 +225,7 @@ public class DownloadListActivity extends AppCompatActivity {
         btnCancel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(px(12), px(8), px(12), px(8));
-        btnCancel.setBackgroundColor(0xFF616161);
+        btnCancel.setBackgroundColor(0xFF2D2D2D);
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         cancelParams.rightMargin = px(4);
@@ -242,7 +242,7 @@ public class DownloadListActivity extends AppCompatActivity {
         btnConfirm.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(16));
         btnConfirm.setGravity(Gravity.CENTER);
         btnConfirm.setPadding(px(12), px(8), px(12), px(8));
-        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        btnConfirm.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         confirmParams.leftMargin = px(4);

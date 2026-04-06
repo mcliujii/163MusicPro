@@ -44,13 +44,13 @@ public class SongInfoActivity extends AppCompatActivity {
     private static final String TAG = "SongInfoActivity";
     private static final String PREFS_NAME = "music163_settings";
 
-    private static final int COLOR_BG = 0xFF212121;
+    private static final int COLOR_BG = 0xFF121212;
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_SECONDARY = 0xFF888888;
-    private static final int COLOR_TEXT_DESC = 0xFFCCCCCC;
-    private static final int COLOR_ACCENT = 0xFFFF5252;
-    private static final int COLOR_DIVIDER = 0xFF424242;
-    private static final int COLOR_CARD_BG = 0xFF2A2A2A;
+    private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
+    private static final int COLOR_TEXT_DESC = 0xB3FFFFFF;
+    private static final int COLOR_ACCENT = 0xFF03DAC6;
+    private static final int COLOR_DIVIDER = 0xFF1E1E1E;
+    private static final int COLOR_CARD_BG = 0xFF252525;
 
     private long songId;
     private String songName;
@@ -498,7 +498,7 @@ public class SongInfoActivity extends AppCompatActivity {
                             final long plId = pl.optLong("id", 0);
                             final String fPlName = plName;
                             final int fTrackCount = pl.optInt("trackCount", 0);
-                            TextView tv = makeText("📋 " + display, COLOR_ACCENT, px(14), false, Gravity.START);
+                            TextView tv = makeText("" + display, COLOR_ACCENT, px(14), false, Gravity.START);
                             tv.setPadding(0, px(2), 0, px(2));
                             if (plId > 0) {
                                 tv.setOnClickListener(v -> openPlaylistDetail(plId, fPlName, fTrackCount, ""));
@@ -711,7 +711,7 @@ public class SongInfoActivity extends AppCompatActivity {
                 int plTrackCount = 0;
                 if (extInfo != null) plTrackCount = extInfo.optInt("trackCount", 0);
                 if (plTrackCount <= 0 && resInfo != null) plTrackCount = resInfo.optInt("trackCount", 0);
-                card.addView(makeSmallLabel("📋 点击查看歌单"));
+                card.addView(makeSmallLabel("点击查看歌单"));
                 final long finalPlId = plId;
                 final String finalPlName = plName;
                 final int finalPlTrackCount = plTrackCount;

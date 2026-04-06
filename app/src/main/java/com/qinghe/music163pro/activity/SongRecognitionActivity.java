@@ -83,7 +83,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
 
         // Title
         TextView title = new TextView(this);
-        title.setText("🎵  识别歌曲");
+        title.setText("识别歌曲");
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         title.setTypeface(title.getTypeface(), android.graphics.Typeface.BOLD);
@@ -94,7 +94,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
         // Status text
         tvStatus = new TextView(this);
         tvStatus.setText("点击下方按钮开始识别");
-        tvStatus.setTextColor(0xFFAAAAAA);
+        tvStatus.setTextColor(0x80FFFFFF);
         tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tvStatus.setGravity(Gravity.CENTER);
         tvStatus.setPadding(0, 0, 0, px(10));
@@ -116,7 +116,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
 
         // Stop recording button — visible only during recording
         btnStop = makeTileButton("⏹  停止录音");
-        btnStop.setBackgroundColor(0xFFC62828);
+        btnStop.setBackgroundColor(0xFFBB86FC);
         btnStop.setVisibility(android.view.View.GONE);
         btnStop.setOnClickListener(v -> stopRecording());
         root.addView(btnStop);
@@ -127,7 +127,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
         tvResult.setTextColor(0xFFFFFFFF);
         tvResult.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tvResult.setPadding(px(6), px(6), px(6), px(6));
-        tvResult.setBackgroundColor(0xFF333333);
+        tvResult.setBackgroundColor(0xFF1E1E1E);
         tvResult.setVisibility(android.view.View.GONE);
         root.addView(tvResult);
 
@@ -213,7 +213,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
                 public void onResult(String songName, String artist, String album, long songId) {
                     String info = songName + "\n" + artist + (album.isEmpty() ? "" : "\n" + album);
                     tvStatus.setText(modeLabel + " 识别成功！");
-                    tvResult.setText("🎵 " + info);
+                    tvResult.setText(info);
                     tvResult.setVisibility(android.view.View.VISIBLE);
                     setButtonsEnabled(true);
                     MusicLog.i(TAG, "识别成功: " + info + " id=" + songId);
@@ -331,7 +331,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
         tv.setTextColor(0xFFFFFFFF);
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tv.setPadding(px(12), px(10), px(12), px(10));
-        tv.setBackgroundColor(0xFF1565C0);
+        tv.setBackgroundColor(0xFFBB86FC);
         tv.setClickable(true);
         tv.setFocusable(true);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
