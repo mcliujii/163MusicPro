@@ -35,7 +35,7 @@ public class ProfileActivity extends AppCompatActivity {
         }
 
         ScrollView scrollView = new ScrollView(this);
-        scrollView.setBackgroundColor(0xFF212121);
+        scrollView.setBackgroundColor(0xFF121212);
         scrollView.setFillViewport(true);
 
         contentLayout = new LinearLayout(this);
@@ -47,7 +47,7 @@ public class ProfileActivity extends AppCompatActivity {
 
         // Title
         TextView title = new TextView(this);
-        title.setText("👤  个人中心");
+        title.setText("个人中心");
         title.setTextColor(0xFFFFFFFF);
         title.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(15));
         title.setGravity(Gravity.CENTER);
@@ -260,7 +260,7 @@ public class ProfileActivity extends AppCompatActivity {
                 switch (vipType) {
                     case 0: vipStr = "普通用户"; break;
                     case 10:
-                    case 11: vipStr = "黑胶VIP 🎵"; break;
+                    case 11: vipStr = "黑胶VIP"; break;
                     default: vipStr = "VIP (类型" + vipType + ")"; break;
                 }
                 addInfoRow("会员类型", vipStr);
@@ -300,7 +300,7 @@ public class ProfileActivity extends AppCompatActivity {
     private void addSectionTitle(String title) {
         TextView tv = new TextView(this);
         tv.setText("── " + title + " ──");
-        tv.setTextColor(0xFFD32F2F);
+        tv.setTextColor(0xFFBB86FC);
         tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(13));
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, px(8), 0, px(4));

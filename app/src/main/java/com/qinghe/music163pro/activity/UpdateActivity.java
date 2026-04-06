@@ -69,7 +69,7 @@ public class UpdateActivity extends AppCompatActivity {
         root.setPadding(px(16), px(24), px(16), px(20));
 
         // Icon / header
-        TextView tvTitle = makeText("🎵 发现新版本", 0xFFFFFFFF, px(20), true, Gravity.CENTER);
+        TextView tvTitle = makeText("发现新版本", 0xFFFFFFFF, px(20), true, Gravity.CENTER);
         root.addView(tvTitle);
 
         root.addView(makeSpacer(px(14)));
@@ -110,7 +110,7 @@ public class UpdateActivity extends AppCompatActivity {
         // Cancel button
         TextView btnCancel = new TextView(this);
         btnCancel.setText("取消");
-        btnCancel.setTextColor(0xFFCCCCCC);
+        btnCancel.setTextColor(0xB3FFFFFF);
         btnCancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setBackgroundColor(0xFF424242);
@@ -130,7 +130,7 @@ public class UpdateActivity extends AppCompatActivity {
         btnUpdate.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         btnUpdate.setTypeface(btnUpdate.getTypeface(), Typeface.BOLD);
         btnUpdate.setGravity(Gravity.CENTER);
-        btnUpdate.setBackgroundColor(0xFFD32F2F);
+        btnUpdate.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams updateParams = new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
         btnUpdate.setLayoutParams(updateParams);
@@ -180,7 +180,7 @@ public class UpdateActivity extends AppCompatActivity {
 
         btnUpdate.setEnabled(false);
         btnUpdate.setText("下载中...");
-        btnUpdate.setBackgroundColor(0xFF888888);
+        btnUpdate.setBackgroundColor(0xFF2D2D2D);
         progressBar.setVisibility(android.view.View.VISIBLE);
         tvProgress.setVisibility(android.view.View.VISIBLE);
         tvProgress.setText("0%");
@@ -192,7 +192,7 @@ public class UpdateActivity extends AppCompatActivity {
             downloading = false;
             btnUpdate.setEnabled(true);
             btnUpdate.setText("更新");
-            btnUpdate.setBackgroundColor(0xFFD32F2F);
+            btnUpdate.setBackgroundColor(0xFFBB86FC);
             return;
         }
 
@@ -214,7 +214,7 @@ public class UpdateActivity extends AppCompatActivity {
                 downloading = false;
                 btnUpdate.setEnabled(true);
                 btnUpdate.setText("重试");
-                btnUpdate.setBackgroundColor(0xFFD32F2F);
+                btnUpdate.setBackgroundColor(0xFFBB86FC);
                 tvProgress.setText("下载失败: " + error);
                 Toast.makeText(UpdateActivity.this, "下载失败: " + error, Toast.LENGTH_SHORT).show();
             }
@@ -242,7 +242,7 @@ public class UpdateActivity extends AppCompatActivity {
             downloading = false;
             btnUpdate.setEnabled(true);
             btnUpdate.setText("重试");
-            btnUpdate.setBackgroundColor(0xFFD32F2F);
+            btnUpdate.setBackgroundColor(0xFFBB86FC);
         }
     }
 

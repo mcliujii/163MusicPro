@@ -23,6 +23,7 @@ import android.view.View;
 import android.view.WindowManager;
 import android.widget.EditText;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -56,8 +57,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private TextView tvSongName;
     private TextView tvArtist;
-    private TextView btnPlay;
-    private TextView btnFuncMore;
+    private ImageView btnPlay;
+    private ImageView btnFuncMore;
     private SeekBar seekBar;
     private TextView tvCurrentTime;
     private TextView tvTotalTime;
@@ -69,7 +70,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private boolean serviceStarted = false;
 
     // Playlist indicator (top-left)
-    private TextView btnPlaylistIndicator;
+    private ImageView btnPlaylistIndicator;
 
     // Functions overlay
     private FrameLayout overlayContainer;
@@ -125,11 +126,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         seekBar = findViewById(R.id.seek_bar);
         tvCurrentTime = findViewById(R.id.tv_current_time);
         tvTotalTime = findViewById(R.id.tv_total_time);
-        TextView btnPrev = findViewById(R.id.btn_prev);
-        TextView btnNext = findViewById(R.id.btn_next);
-        TextView btnVolDown = findViewById(R.id.btn_vol_down);
-        TextView btnVolUp = findViewById(R.id.btn_vol_up);
-        TextView btnMore = findViewById(R.id.btn_more);
+        ImageView btnPrev = findViewById(R.id.btn_prev);
+        ImageView btnNext = findViewById(R.id.btn_next);
+        ImageView btnVolDown = findViewById(R.id.btn_vol_down);
+        ImageView btnVolUp = findViewById(R.id.btn_vol_up);
+        ImageView btnMore = findViewById(R.id.btn_more);
         btnPlaylistIndicator = findViewById(R.id.btn_playlist_indicator);
 
         playerManager = MusicPlayerManager.getInstance();
@@ -392,7 +393,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333); // Gray mask
+        overlayContainer.setBackgroundColor(0xCC000000); // Gray mask
 
         // Swipe right to dismiss + click to dismiss
         addSwipeToDismiss(overlayContainer);
@@ -430,9 +431,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         } else {
             isFav = favoritesManager.isFavorite(song.getId());
         }
-        row1.addView(createFuncItem(isFav ? "♥" : "♡", isFav ? "取消收藏" : "收藏",
+        row1.addView(createFuncItem(isFav ? R.drawable.ic_favorite : R.drawable.ic_favorite_border,
+                isFav ? "取消收藏" : "收藏",
                 v -> onFuncFavorite(song)));
-        row1.addView(createFuncItem("⬇", "下载",
+        row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
                 v -> onFuncDownload(song)));
         contentLayout.addView(row1);
 
@@ -444,11 +446,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row2.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row2.addView(createFuncItem("🔔", "设为铃声",
+        row2.addView(createFuncItem(R.drawable.ic_notifications, "设为铃声",
                 v -> onFuncSetRingtone(song)));
 
         // Sleep timer - show remaining time if active, with live updates
-        LinearLayout timerItem = createFuncItem("⏱",
+        LinearLayout timerItem = createFuncItem(R.drawable.ic_timer,
                 playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
                 v -> onFuncSleepTimer());
         row2.addView(timerItem);
@@ -485,28 +487,28 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row3.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        String playModeIcon;
+        int playModeIconRes;
         String playModeLabel;
         switch (playerManager.getPlayMode()) {
             case SINGLE_REPEAT:
-                playModeIcon = "🔂";
+                playModeIconRes = R.drawable.ic_repeat_one;
                 playModeLabel = "单曲循环";
                 break;
             case RANDOM:
-                playModeIcon = "🔀";
+                playModeIconRes = R.drawable.ic_shuffle;
                 playModeLabel = "随机播放";
                 break;
             case LIST_LOOP:
             default:
-                playModeIcon = "🔁";
+                playModeIconRes = R.drawable.ic_repeat;
                 playModeLabel = "列表循环";
                 break;
         }
-        row3.addView(createFuncItem(playModeIcon, playModeLabel,
+        row3.addView(createFuncItem(playModeIconRes, playModeLabel,
                 v -> onFuncCyclePlayMode()));
         float currentSpeed = playerManager.getPlaybackSpeed();
         String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
-        row3.addView(createFuncItem("⚡", speedLabel,
+        row3.addView(createFuncItem(R.drawable.ic_speed, speedLabel,
                 v -> onFuncPlaybackSpeed()));
         contentLayout.addView(row3);
 
@@ -518,9 +520,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row4.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row4.addView(createFuncItem("ℹ", "音乐信息",
+        row4.addView(createFuncItem(R.drawable.ic_info, "音乐信息",
                 v -> onFuncSongInfo(song)));
-        row4.addView(createFuncItem("💬", "评论",
+        row4.addView(createFuncItem(R.drawable.ic_comment, "评论",
                 v -> onFuncComments(song)));
         contentLayout.addView(row4);
 
@@ -532,9 +534,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row5.setLayoutParams(new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
 
-        row5.addView(createFuncItem("📋", "播放列表",
+        row5.addView(createFuncItem(R.drawable.ic_queue_music, "播放列表",
                 v -> onFuncShowPlaylist()));
-        row5.addView(createFuncItem("➕", "添加到歌单",
+        row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
                 v -> onFuncAddToPlaylist(song)));
         contentLayout.addView(row5);
 
@@ -567,15 +569,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         titleBar.addView(title);
 
         // Close button on the right
-        TextView btnClose = new TextView(this);
-        btnClose.setText("✕");
-        btnClose.setTextColor(0xFFFFFFFF);
-        btnClose.setTextSize(15);
-        btnClose.setGravity(Gravity.CENTER);
-        btnClose.setPadding(dp(8), dp(4), dp(8), dp(4));
-        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        ImageView btnClose = new ImageView(this);
+        btnClose.setImageResource(R.drawable.ic_close);
+        btnClose.setColorFilter(0xFFFFFFFF);
+        int closeSize = dp(18);
+        FrameLayout.LayoutParams closeParams = new FrameLayout.LayoutParams(closeSize, closeSize);
         closeParams.gravity = Gravity.END | Gravity.CENTER_VERTICAL;
+        closeParams.setMarginEnd(dp(4));
         btnClose.setLayoutParams(closeParams);
         btnClose.setClickable(true);
         btnClose.setFocusable(true);
@@ -620,7 +620,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         });
     }
 
-    private LinearLayout createFuncItem(String icon, String label, View.OnClickListener listener) {
+    private LinearLayout createFuncItem(int iconRes, String label, View.OnClickListener listener) {
         LinearLayout item = new LinearLayout(this);
         item.setOrientation(LinearLayout.VERTICAL);
         item.setGravity(Gravity.CENTER);
@@ -630,10 +630,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         item.setClickable(true);
         item.setFocusable(true);
 
-        TextView iconView = new TextView(this);
-        iconView.setText(icon);
-        iconView.setTextSize(24);
-        iconView.setGravity(Gravity.CENTER);
+        ImageView iconView = new ImageView(this);
+        iconView.setImageResource(iconRes);
+        int iconSize = dp(24);
+        LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(iconSize, iconSize);
+        iconParams.gravity = Gravity.CENTER_HORIZONTAL;
+        iconView.setLayoutParams(iconParams);
         item.addView(iconView);
 
         TextView labelView = new TextView(this);
@@ -686,11 +688,11 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
 
         volumeIndicator = new TextView(this);
-        volumeIndicator.setText("🔊  " + current + "/" + max + "\n" + bar.toString());
+        volumeIndicator.setText("音量 " + current + "/" + max + "\n" + bar.toString());
         volumeIndicator.setTextColor(0xFFFFFFFF);
         volumeIndicator.setTextSize(13);
         volumeIndicator.setGravity(Gravity.CENTER);
-        volumeIndicator.setBackgroundColor(0xCC333333);
+        volumeIndicator.setBackgroundColor(0xCC000000);
         volumeIndicator.setPadding(dp(16), dp(8), dp(16), dp(8));
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
@@ -808,14 +810,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         String modeName;
         switch (next) {
             case SINGLE_REPEAT:
-                modeName = "单曲循环 🔂";
+                modeName = "单曲循环";
                 break;
             case RANDOM:
-                modeName = "随机播放 🔀";
+                modeName = "随机播放";
                 break;
             case LIST_LOOP:
             default:
-                modeName = "列表循环 🔁";
+                modeName = "列表循环";
                 break;
         }
         Toast.makeText(this, "播放模式: " + modeName, Toast.LENGTH_SHORT).show();
@@ -943,7 +945,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xFF212121);
+        overlayContainer.setBackgroundColor(0xFF1E1E1E);
         // Consume all touch events to prevent underlying buttons from receiving clicks
         overlayContainer.setOnTouchListener((v, event) -> true);
         // Don't use addSwipeToDismiss - dispatchTouchEvent handles swipe gestures
@@ -978,7 +980,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         translationEnabled = transPrefs.getBoolean("lyrics_translation", false);
         btnTranslationToggle = new TextView(this);
         btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
-        btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+        btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
         btnTranslationToggle.setTextSize(12);
         btnTranslationToggle.setGravity(Gravity.CENTER);
         btnTranslationToggle.setPadding(dp(6), dp(4), dp(6), dp(4));
@@ -1012,7 +1014,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Time display at bottom
         tvLyricsTimeRef = new TextView(this);
-        tvLyricsTimeRef.setTextColor(0xFF757575);
+        tvLyricsTimeRef.setTextColor(0x80FFFFFF);
         tvLyricsTimeRef.setTextSize(10);
         tvLyricsTimeRef.setGravity(Gravity.CENTER);
         tvLyricsTimeRef.setPadding(0, dp(2), 0, dp(4));
@@ -1057,7 +1059,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricsContainer.removeAllViews();
         TextView tvLoading = new TextView(this);
         tvLoading.setText("加载歌词中...");
-        tvLoading.setTextColor(0xFF888888);
+        tvLoading.setTextColor(0xB3FFFFFF);
         tvLoading.setTextSize(13);
         tvLoading.setGravity(Gravity.CENTER);
         lyricsContainer.addView(tvLoading);
@@ -1229,7 +1231,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Update button appearance
         if (btnTranslationToggle != null) {
             btnTranslationToggle.setText(translationEnabled ? "译✓" : "译");
-            btnTranslationToggle.setTextColor(translationEnabled ? 0xFFFF5252 : 0xFF888888);
+            btnTranslationToggle.setTextColor(translationEnabled ? 0xFFBB86FC : 0x80FFFFFF);
         }
         // Re-display lyrics with or without translation
         displayLyricsInOverlay();
@@ -1262,7 +1264,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             // Original lyrics text
             TextView tv = new TextView(this);
             tv.setText(line.text);
-            tv.setTextColor(0xFF888888);
+            tv.setTextColor(0xB3FFFFFF);
             tv.setTextSize(13);
             tv.setGravity(Gravity.CENTER);
             lineLayout.addView(tv);
@@ -1272,7 +1274,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             if (translationEnabled && line.translation != null && !line.translation.isEmpty()) {
                 TextView tvTrans = new TextView(this);
                 tvTrans.setText(line.translation);
-                tvTrans.setTextColor(0xFF666666);
+                tvTrans.setTextColor(0x61FFFFFF);
                 tvTrans.setTextSize(11);
                 tvTrans.setGravity(Gravity.CENTER);
                 tvTrans.setPadding(0, dp(1), 0, 0);
@@ -1289,7 +1291,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         lyricViews.clear();
         TextView tv = new TextView(this);
         tv.setText("暂无歌词");
-        tv.setTextColor(0xFF888888);
+        tv.setTextColor(0xB3FFFFFF);
         tv.setTextSize(14);
         tv.setGravity(Gravity.CENTER);
         tv.setPadding(0, dp(40), 0, 0);
@@ -1320,7 +1322,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
                     if (newIndex != currentHighlightIndex && newIndex >= 0) {
                         if (currentHighlightIndex >= 0 && currentHighlightIndex < lyricViews.size()) {
-                            lyricViews.get(currentHighlightIndex).setTextColor(0xFF888888);
+                            lyricViews.get(currentHighlightIndex).setTextColor(0xB3FFFFFF);
                             lyricViews.get(currentHighlightIndex).setTextSize(13);
                         }
                         currentHighlightIndex = newIndex;
@@ -1394,13 +1396,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setBackgroundColor(0xCC000000);
         addSwipeToDismiss(overlayContainer);
 
         LinearLayout contentLayout = new LinearLayout(this);
         contentLayout.setOrientation(LinearLayout.VERTICAL);
         contentLayout.setPadding(dp(8), dp(8), dp(8), dp(8));
-        contentLayout.setBackgroundColor(0xFF212121);
+        contentLayout.setBackgroundColor(0xFF1E1E1E);
         FrameLayout.LayoutParams contentParams = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
         contentLayout.setLayoutParams(contentParams);
@@ -1431,13 +1433,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             // Highlight current playing song
             if (i == currentIndex) {
-                itemLayout.setBackgroundColor(0xFF333333);
+                itemLayout.setBackgroundColor(0xFF1E1E1E);
             }
 
             TextView tvName = new TextView(this);
             String prefix = (i == currentIndex) ? "▶ " : (i + 1) + ". ";
             tvName.setText(prefix + song.getName());
-            tvName.setTextColor(i == currentIndex ? 0xFFD32F2F : 0xFFFFFFFF);
+            tvName.setTextColor(i == currentIndex ? 0xFFBB86FC : 0xFFFFFFFF);
             tvName.setTextSize(13);
             tvName.setSingleLine(true);
             tvName.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1445,7 +1447,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
             TextView tvArtist = new TextView(this);
             tvArtist.setText(song.getArtist());
-            tvArtist.setTextColor(0xFF757575);
+            tvArtist.setTextColor(0x80FFFFFF);
             tvArtist.setTextSize(11);
             tvArtist.setSingleLine(true);
             tvArtist.setEllipsize(android.text.TextUtils.TruncateAt.END);
@@ -1482,7 +1484,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setBackgroundColor(0xCC000000);
         addSwipeToDismiss(overlayContainer);
 
         ScrollView scrollView = new ScrollView(this);
@@ -1512,7 +1514,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFD32F2F : 0xFF424242);
+            btn.setBackgroundColor(Math.abs(currentSpeed - speed) < 0.01f ? 0xFFBB86FC : 0xFF2D2D2D);
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -1531,7 +1533,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Custom speed input
         TextView customLabel = new TextView(this);
         customLabel.setText("自定义（0.1-5.0）");
-        customLabel.setTextColor(0xFFCCCCCC);
+        customLabel.setTextColor(0xB3FFFFFF);
         customLabel.setTextSize(13);
         customLabel.setGravity(Gravity.CENTER);
         customLabel.setPadding(0, dp(12), 0, dp(4));
@@ -1549,7 +1551,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         etSpeed.setHintTextColor(0xFF888888);
         etSpeed.setTextSize(14);
         etSpeed.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL);
-        etSpeed.setBackgroundColor(0xFF424242);
+        etSpeed.setBackgroundColor(0xFF2D2D2D);
         etSpeed.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -1563,7 +1565,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnApply.setTextSize(14);
         btnApply.setGravity(Gravity.CENTER);
         btnApply.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnApply.setBackgroundColor(0xFFD32F2F);
+        btnApply.setBackgroundColor(0xFFBB86FC);
         btnApply.setClickable(true);
         btnApply.setFocusable(true);
         btnApply.setOnClickListener(v -> {
@@ -1682,7 +1684,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setBackgroundColor(0xCC000000);
         addSwipeToDismiss(overlayContainer);
 
         // Wrap content in ScrollView for small watch screens
@@ -1708,7 +1710,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Song name
         TextView tvSong = new TextView(this);
         tvSong.setText(songTitle);
-        tvSong.setTextColor(0xFFCCCCCC);
+        tvSong.setTextColor(0xB3FFFFFF);
         tvSong.setTextSize(12);
         tvSong.setGravity(Gravity.CENTER);
         tvSong.setPadding(0, 0, 0, dp(8));
@@ -1750,7 +1752,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Duration display
         TextView tvDuration = new TextView(this);
         tvDuration.setText("节选: " + startSec[0] + "s - " + endSec[0] + "s (" + (endSec[0] - startSec[0]) + "秒)");
-        tvDuration.setTextColor(0xFFCCCCCC);
+        tvDuration.setTextColor(0xB3FFFFFF);
         tvDuration.setTextSize(12);
         tvDuration.setGravity(Gravity.CENTER);
         tvDuration.setPadding(0, dp(8), 0, dp(8));
@@ -1802,12 +1804,12 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Preview button
         TextView btnPreview = new TextView(this);
-        btnPreview.setText("▶ 试听");
+        btnPreview.setText("试听");
         btnPreview.setTextColor(0xFFFFFFFF);
         btnPreview.setTextSize(13);
         btnPreview.setGravity(Gravity.CENTER);
         btnPreview.setPadding(dp(12), dp(10), dp(12), dp(10));
-        btnPreview.setBackgroundColor(0xFF616161);
+        btnPreview.setBackgroundColor(0xFF3D3D3D);
         LinearLayout.LayoutParams previewParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         previewParams.rightMargin = dp(4);
@@ -1830,7 +1832,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnConfirm.setTextSize(13);
         btnConfirm.setGravity(Gravity.CENTER);
         btnConfirm.setPadding(dp(12), dp(10), dp(12), dp(10));
-        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        btnConfirm.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         confirmParams.leftMargin = dp(4);
@@ -2089,7 +2091,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setBackgroundColor(0xCC000000);
         addSwipeToDismiss(overlayContainer);
 
         ScrollView scrollView = new ScrollView(this);
@@ -2116,7 +2118,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             btn.setTextSize(14);
             btn.setGravity(Gravity.CENTER);
             btn.setPadding(0, dp(10), 0, dp(10));
-            btn.setBackgroundColor(0xFF424242);
+            btn.setBackgroundColor(0xFF2D2D2D);
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
             btnParams.bottomMargin = dp(4);
@@ -2135,7 +2137,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         // Custom seconds label
         TextView customLabel = new TextView(this);
         customLabel.setText("自定义（秒）");
-        customLabel.setTextColor(0xFFCCCCCC);
+        customLabel.setTextColor(0xB3FFFFFF);
         customLabel.setTextSize(13);
         customLabel.setGravity(Gravity.CENTER);
         customLabel.setPadding(0, dp(12), 0, dp(4));
@@ -2154,7 +2156,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         etSeconds.setHintTextColor(0xFF888888);
         etSeconds.setTextSize(14);
         etSeconds.setInputType(InputType.TYPE_CLASS_NUMBER);
-        etSeconds.setBackgroundColor(0xFF424242);
+        etSeconds.setBackgroundColor(0xFF2D2D2D);
         etSeconds.setPadding(dp(8), dp(8), dp(8), dp(8));
         LinearLayout.LayoutParams etParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
@@ -2168,7 +2170,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCustom.setTextSize(14);
         btnCustom.setGravity(Gravity.CENTER);
         btnCustom.setPadding(dp(12), dp(8), dp(12), dp(8));
-        btnCustom.setBackgroundColor(0xFFD32F2F);
+        btnCustom.setBackgroundColor(0xFFBB86FC);
         btnCustom.setClickable(true);
         btnCustom.setFocusable(true);
         btnCustom.setOnClickListener(v -> {
@@ -2205,7 +2207,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         overlayContainer = new FrameLayout(this);
         overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
-        overlayContainer.setBackgroundColor(0xCC333333);
+        overlayContainer.setBackgroundColor(0xCC000000);
         addSwipeToDismiss(overlayContainer);
 
         LinearLayout contentLayout = new LinearLayout(this);
@@ -2257,7 +2259,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         btnCancel.setTextSize(14);
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(0, dp(10), 0, dp(10));
-        btnCancel.setBackgroundColor(0xFFD32F2F);
+        btnCancel.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         btnCancel.setLayoutParams(cancelParams);
@@ -2286,9 +2288,8 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             tvSongName.setText(R.string.no_song);
             tvArtist.setText("");
         }
-        btnPlay.setText(playerManager.isPlaying() ? "\u23F8" : "\u25B6");
-        // btnFuncMore always shows "more" icon
-        btnFuncMore.setText("⋯");
+        btnPlay.setImageResource(playerManager.isPlaying() ? R.drawable.ic_pause : R.drawable.ic_play_arrow);
+        // btnFuncMore image is static in layout
         // Update playlist indicator visibility
         updatePlaylistIndicator();
     }
@@ -2335,7 +2336,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     @Override
     public void onPlayStateChanged(boolean isPlaying) {
-        btnPlay.setText(isPlaying ? "\u23F8" : "\u25B6");
+        btnPlay.setImageResource(isPlaying ? R.drawable.ic_pause : R.drawable.ic_play_arrow);
         if (isPlaying) {
             startSeekBarUpdate();
         } else {

@@ -20,15 +20,15 @@
     <string name="code_label">验证码</string>
     <string name="code_hint">请输入验证码</string>
     <string name="login">登录</string>
-    <string name="play_mode_list_loop">播放模式: 列表循环 🔁</string>
-    <string name="play_mode_single">播放模式: 单曲循环 🔂</string>
-    <string name="play_mode_random">播放模式: 随机播放 🔀</string>
+    <string name="play_mode_list_loop">播放模式: 列表循环</string>
+    <string name="play_mode_single">播放模式: 单曲循环</string>
+    <string name="play_mode_random">播放模式: 随机播放</string>
     <string name="downloads">下载列表</string>
     <string name="func_more">更多功能</string>
-    <string name="keep_screen_on_on">屏幕常亮: 已开启 💡</string>
-    <string name="keep_screen_on_off">屏幕常亮: 已关闭 🌙</string>
+    <string name="keep_screen_on_on">屏幕常亮: 已开启</string>
+    <string name="keep_screen_on_off">屏幕常亮: 已关闭</string>
     <string name="lyrics">歌词</string>
-    <string name="fav_mode_local">收藏模式: 本地 📱</string>
-    <string name="fav_mode_cloud">收藏模式: 云端 ☁</string>
+    <string name="fav_mode_local">收藏模式: 本地</string>
+    <string name="fav_mode_cloud">收藏模式: 云端</string>
     <string name="ringtone_manager">铃声管理</string>
 </resources>

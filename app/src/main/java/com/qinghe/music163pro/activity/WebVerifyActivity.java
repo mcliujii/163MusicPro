@@ -57,7 +57,7 @@ public class WebVerifyActivity extends AppCompatActivity {
         // Header hint
         TextView hint = new TextView(this);
         hint.setText("请完成安全验证后自动继续登录");
-        hint.setTextColor(0xFFAAAAAA);
+        hint.setTextColor(0x80FFFFFF);
         hint.setTextSize(12);
         hint.setPadding(12, 8, 12, 8);
         hint.setGravity(android.view.Gravity.CENTER);
@@ -109,7 +109,7 @@ public class WebVerifyActivity extends AppCompatActivity {
         btnDone.setTextSize(13);
         btnDone.setGravity(android.view.Gravity.CENTER);
         btnDone.setPadding(12, 14, 12, 14);
-        btnDone.setBackgroundColor(0xFF1565C0);
+        btnDone.setBackgroundColor(0xFFBB86FC);
         btnDone.setClickable(true);
         btnDone.setFocusable(true);
         btnDone.setOnClickListener(v -> deliverResult());

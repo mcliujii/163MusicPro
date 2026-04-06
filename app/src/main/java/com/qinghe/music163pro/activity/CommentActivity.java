@@ -5,6 +5,7 @@ import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PorterDuff;
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
@@ -27,6 +28,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.util.MusicLog;
 
@@ -47,11 +49,11 @@ public class CommentActivity extends AppCompatActivity {
     private static final String PREFS_NAME = "music163_settings";
     private static final int PAGE_SIZE = 20;
 
-    private static final int COLOR_BG = 0xFF212121;
+    private static final int COLOR_BG = 0xFF121212;
     private static final int COLOR_TEXT_PRIMARY = 0xFFFFFFFF;
-    private static final int COLOR_TEXT_SECONDARY = 0xFF888888;
-    private static final int COLOR_ACCENT = 0xFFFF5252;
-    private static final int COLOR_DIVIDER = 0xFF424242;
+    private static final int COLOR_TEXT_SECONDARY = 0x80FFFFFF;
+    private static final int COLOR_ACCENT = 0xFF03DAC6;
+    private static final int COLOR_DIVIDER = 0xFF1E1E1E;
     private static final int COLOR_INPUT_BG = 0xFF333333;
 
     private static final int[] AVATAR_COLORS = {
@@ -216,7 +218,7 @@ public class CommentActivity extends AppCompatActivity {
 
     private void styleSortTab(TextView tab, boolean active) {
         if (active) {
-            tab.setTextColor(COLOR_ACCENT);
+            tab.setTextColor(0xFFBB86FC);
             tab.setTypeface(tab.getTypeface(), Typeface.BOLD);
         } else {
             tab.setTextColor(COLOR_TEXT_SECONDARY);
@@ -608,10 +610,17 @@ public class CommentActivity extends AppCompatActivity {
     }
 
     private void updateLikeText(TextView tv, boolean liked, int count) {
-        String heart = liked ? "♥" : "♡";
-        String text = count > 0 ? heart + " " + count : heart;
+        String text = count > 0 ? " " + count : "";
         tv.setText(text);
-        tv.setTextColor(liked ? COLOR_ACCENT : COLOR_TEXT_SECONDARY);
+        int iconRes = liked ? R.drawable.ic_thumb_up : R.drawable.ic_thumb_up_outline;
+        android.graphics.drawable.Drawable icon = getResources().getDrawable(iconRes, null);
+        int iconSize = px(14);
+        icon.setBounds(0, 0, iconSize, iconSize);
+        icon.setColorFilter(liked ? COLOR_ACCENT : 0x80FFFFFF,
+                android.graphics.PorterDuff.Mode.SRC_IN);
+        tv.setCompoundDrawables(icon, null, null, null);
+        tv.setCompoundDrawablePadding(px(3));
+        tv.setTextColor(liked ? COLOR_ACCENT : 0x80FFFFFF);
     }
 
     // ──────────────────────────────────────────────────────
@@ -835,11 +844,11 @@ public class CommentActivity extends AppCompatActivity {
         overlay.setLayoutParams(new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT));
-        overlay.setBackgroundColor(0xCC333333);
+        overlay.setBackgroundColor(0xCC000000);
 
         LinearLayout dialog = new LinearLayout(this);
         dialog.setOrientation(LinearLayout.VERTICAL);
-        dialog.setBackgroundColor(0xFF424242);
+        dialog.setBackgroundColor(0xFF1E1E1E);
         dialog.setPadding(px(16), px(12), px(16), px(12));
         android.widget.FrameLayout.LayoutParams dlgParams = new android.widget.FrameLayout.LayoutParams(
                 android.widget.FrameLayout.LayoutParams.MATCH_PARENT,
@@ -861,7 +870,7 @@ public class CommentActivity extends AppCompatActivity {
         // Message
         TextView tvMessage = new TextView(this);
         tvMessage.setText(message);
-        tvMessage.setTextColor(0xFFCCCCCC);
+        tvMessage.setTextColor(0xB3FFFFFF);
         tvMessage.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(15));
         tvMessage.setGravity(Gravity.CENTER);
         tvMessage.setPadding(0, 0, 0, px(12));
@@ -880,7 +889,7 @@ public class CommentActivity extends AppCompatActivity {
         btnCancel.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         btnCancel.setGravity(Gravity.CENTER);
         btnCancel.setPadding(px(12), px(8), px(12), px(8));
-        btnCancel.setBackgroundColor(0xFF616161);
+        btnCancel.setBackgroundColor(0xFF2D2D2D);
         LinearLayout.LayoutParams cancelParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         cancelParams.rightMargin = px(4);
@@ -897,7 +906,7 @@ public class CommentActivity extends AppCompatActivity {
         btnConfirm.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(16));
         btnConfirm.setGravity(Gravity.CENTER);
         btnConfirm.setPadding(px(12), px(8), px(12), px(8));
-        btnConfirm.setBackgroundColor(0xFFD32F2F);
+        btnConfirm.setBackgroundColor(0xFFBB86FC);
         LinearLayout.LayoutParams confirmParams = new LinearLayout.LayoutParams(
                 0, LinearLayout.LayoutParams.WRAP_CONTENT, 1);
         confirmParams.leftMargin = px(4);
