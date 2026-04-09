@@ -36,9 +36,8 @@ public final class WatchUiUtils {
         if (context == null || baseValue == 0) {
             return baseValue;
         }
-        DisplayMetrics metrics = context.getResources() != null
-                ? context.getResources().getDisplayMetrics() : null;
-        int screenWidth = metrics != null ? metrics.widthPixels : 0;
+        DisplayMetrics metrics = context.getResources().getDisplayMetrics();
+        int screenWidth = metrics.widthPixels;
         if (screenWidth <= 0) {
             screenWidth = (int) DESIGN_WIDTH_PX;
         }

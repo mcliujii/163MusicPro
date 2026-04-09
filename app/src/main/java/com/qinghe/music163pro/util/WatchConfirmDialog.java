@@ -16,7 +16,7 @@ public final class WatchConfirmDialog {
     private static final int DEFAULT_TITLE_TEXT_COLOR = 0xFFFFFFFF;
     private static final int DEFAULT_MESSAGE_TEXT_COLOR = 0xB3FFFFFF;
     private static final int DEFAULT_CANCEL_BUTTON_COLOR = 0xFF2D2D2D;
-    private static final Object OVERLAY_TAG = "watch_confirm_dialog_overlay";
+    private static final String OVERLAY_TAG = "watch_confirm_dialog_overlay";
 
     private WatchConfirmDialog() {
     }
