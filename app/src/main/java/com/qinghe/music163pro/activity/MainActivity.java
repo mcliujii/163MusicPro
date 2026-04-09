@@ -25,6 +25,7 @@ import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -54,6 +55,13 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private static final String HEART_OUTLINE = "\u2661";
     private static final String HEART_FILLED = "\u2665";
     private static final int STORAGE_PERMISSION_REQUEST = 100;
+    private static final int VOLUME_INDICATOR_SIDE_MARGIN_DP = 24;
+    private static final int VOLUME_INDICATOR_MIN_WIDTH_DP = 96;
+    private static final int VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP = 132;
+    private static final int VOLUME_INDICATOR_MAX_WIDTH_DP = 176;
+    private static final int VOLUME_INDICATOR_TOP_MARGIN_DP = 10;
+    private static final int VOLUME_INDICATOR_ANIM_DURATION_MS = 160;
+    private static final float VOLUME_INDICATOR_INITIAL_SCALE = 0.96f;
 
     private TextView tvSongName;
     private TextView tvArtist;
@@ -78,7 +86,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     private Runnable overlayTimerRunnable;
 
     // Volume indicator
-    private TextView volumeIndicator;
+    private View volumeIndicator;
     private final Handler volumeHandler = new Handler();
 
     // Activity-level gesture detector for swipe handling
@@ -681,27 +689,99 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             rootView.removeView(volumeIndicator);
         }
 
-        // Build volume bar string
-        StringBuilder bar = new StringBuilder();
-        for (int i = 0; i < max; i++) {
-            bar.append(i < current ? "█" : "░");
-        }
+        boolean hasVolumeInfo = max > 0;
+        int percent = hasVolumeInfo ? Math.round(current * 100f / max) : 0;
+        int availableWidth = Math.max(
+                getResources().getDisplayMetrics().widthPixels - dp(VOLUME_INDICATOR_SIDE_MARGIN_DP * 2),
+                dp(VOLUME_INDICATOR_MIN_WIDTH_DP));
+        int popupWidth = availableWidth > dp(VOLUME_INDICATOR_COMPACT_BREAKPOINT_DP)
+                ? Math.min(availableWidth, dp(VOLUME_INDICATOR_MAX_WIDTH_DP))
+                : availableWidth;
 
-        volumeIndicator = new TextView(this);
-        volumeIndicator.setText("音量 " + current + "/" + max + "\n" + bar.toString());
-        volumeIndicator.setTextColor(0xFFFFFFFF);
-        volumeIndicator.setTextSize(13);
-        volumeIndicator.setGravity(Gravity.CENTER);
-        volumeIndicator.setBackgroundColor(0xCC000000);
-        volumeIndicator.setPadding(dp(16), dp(8), dp(16), dp(8));
+        LinearLayout card = new LinearLayout(this);
+        card.setOrientation(LinearLayout.VERTICAL);
+        card.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_volume_indicator));
+        card.setElevation(dp(6));
+        card.setPadding(dp(14), dp(12), dp(14), dp(12));
+        card.setClickable(false);
+        card.setFocusable(false);
+
+        LinearLayout topRow = new LinearLayout(this);
+        topRow.setOrientation(LinearLayout.HORIZONTAL);
+        topRow.setGravity(Gravity.CENTER_VERTICAL);
+        topRow.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+
+        FrameLayout iconWrap = new FrameLayout(this);
+        LinearLayout.LayoutParams iconWrapParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+        iconWrap.setLayoutParams(iconWrapParams);
+        iconWrap.setBackground(ContextCompat.getDrawable(this, R.drawable.bg_volume_indicator_icon));
+
+        ImageView iconView = new ImageView(this);
+        FrameLayout.LayoutParams iconParams = new FrameLayout.LayoutParams(dp(18), dp(18));
+        iconParams.gravity = Gravity.CENTER;
+        iconView.setLayoutParams(iconParams);
+        iconView.setImageResource(current == 0 ? R.drawable.ic_volume_off : R.drawable.ic_volume_up);
+        iconView.setColorFilter(ContextCompat.getColor(this, R.color.colorPrimary));
+        iconWrap.addView(iconView);
+
+        LinearLayout titleWrap = new LinearLayout(this);
+        titleWrap.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams titleWrapParams = new LinearLayout.LayoutParams(
+                0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+        titleWrapParams.leftMargin = dp(10);
+        titleWrap.setLayoutParams(titleWrapParams);
+
+        TextView titleView = new TextView(this);
+        titleView.setText("当前音量");
+        titleView.setTextColor(ContextCompat.getColor(this, R.color.text_secondary));
+        titleView.setTextSize(11);
+
+        TextView valueView = new TextView(this);
+        valueView.setText(hasVolumeInfo ? (current + "/" + max) : "不可用");
+        valueView.setTextColor(ContextCompat.getColor(this, R.color.text_primary));
+        valueView.setTextSize(16);
+        valueView.setTypeface(valueView.getTypeface(), android.graphics.Typeface.BOLD);
+
+        titleWrap.addView(titleView);
+        titleWrap.addView(valueView);
+
+        TextView percentView = new TextView(this);
+        percentView.setText(hasVolumeInfo ? (percent + "%") : "--");
+        percentView.setTextColor(ContextCompat.getColor(this, R.color.colorPrimary));
+        percentView.setTextSize(14);
+        percentView.setTypeface(percentView.getTypeface(), android.graphics.Typeface.BOLD);
+
+        topRow.addView(iconWrap);
+        topRow.addView(titleWrap);
+        topRow.addView(percentView);
+
+        ProgressBar progressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(6));
+        progressParams.topMargin = dp(10);
+        progressBar.setLayoutParams(progressParams);
+        progressBar.setMax(hasVolumeInfo ? max : 1);
+        progressBar.setProgress(hasVolumeInfo ? current : 0);
+        progressBar.setProgressDrawable(ContextCompat.getDrawable(this, R.drawable.progress_volume_indicator));
+
+        card.addView(topRow);
+        card.addView(progressBar);
+        volumeIndicator = card;
 
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+                popupWidth, FrameLayout.LayoutParams.WRAP_CONTENT);
         params.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        params.topMargin = dp(8);
+        params.topMargin = dp(VOLUME_INDICATOR_TOP_MARGIN_DP);
         volumeIndicator.setLayoutParams(params);
 
         rootView.addView(volumeIndicator);
+        volumeIndicator.setAlpha(0f);
+        volumeIndicator.setScaleX(VOLUME_INDICATOR_INITIAL_SCALE);
+        volumeIndicator.setScaleY(VOLUME_INDICATOR_INITIAL_SCALE);
+        volumeIndicator.animate().alpha(1f).scaleX(1f).scaleY(1f)
+                .setDuration(VOLUME_INDICATOR_ANIM_DURATION_MS)
+                .start();
 
         // Auto-dismiss after 1.5 seconds
         volumeHandler.removeCallbacksAndMessages(null);
