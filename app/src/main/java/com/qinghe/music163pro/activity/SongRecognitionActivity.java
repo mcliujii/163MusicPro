@@ -31,6 +31,7 @@ import java.util.ArrayList;
 public class SongRecognitionActivity extends AppCompatActivity {
 
     private static final String TAG = "SongRecognitionActivity";
+    private static final String PREFS_NAME = "music163_settings";
     private static final int REQUEST_RECORD_AUDIO = 101;
     private static final int SAMPLE_RATE = 16000;
     private static final int RECORD_SECONDS = 10;
@@ -49,7 +50,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        if (getSharedPreferences("music163_settings", MODE_PRIVATE)
+        if (getSharedPreferences(PREFS_NAME, MODE_PRIVATE)
                 .getBoolean("keep_screen_on", false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }

@@ -44,6 +44,7 @@ public class MusicApiHelper {
     // Mobile User-Agent for SMS login to avoid "环境不安全" error
     private static final String MOBILE_USER_AGENT =
             "NeteaseMusic/9.0.90 (Android 13; Pixel 6)";
+    private static final String AUDIO_MATCH_SESSION_ID = UUID.randomUUID().toString().replace("-", "");
 
     // Device/version info to prevent "version too old" errors
     private static final String OS_VER = "16.2";
@@ -2128,7 +2129,7 @@ public class MusicApiHelper {
                 MusicLog.op(TAG, "听歌识曲", "duration=" + durationSec + "s");
 
                 String apiUrl = "https://interface.music.163.com/api/music/audio/match";
-                String postBody = "sessionId=" + UUID.randomUUID().toString().replace("-", "")
+                String postBody = "sessionId=" + AUDIO_MATCH_SESSION_ID
                         + "&algorithmCode=shazam_v2"
                         + "&duration=" + Math.max(1, durationSec)
                         + "&rawdata=" + URLEncoder.encode(fingerprintBase64, "UTF-8")

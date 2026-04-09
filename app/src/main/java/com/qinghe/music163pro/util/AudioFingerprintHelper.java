@@ -20,6 +20,7 @@ public final class AudioFingerprintHelper {
 
     private static final String TAG = "AudioFingerprintHelper";
     private static final Handler MAIN_HANDLER = new Handler(Looper.getMainLooper());
+    private static final int PCM16_BYTES_PER_SAMPLE = 2;
 
     public interface Callback {
         void onSuccess(String fingerprintBase64, int durationSec);
@@ -29,13 +30,14 @@ public final class AudioFingerprintHelper {
     private AudioFingerprintHelper() {
     }
 
-    public static void generateFingerprint(Activity activity, byte[] pcmData, int sampleRate,
+    public static void generateFingerprint(Activity activity, byte[] pcmData, int pcm16SampleRate,
                                            Callback callback) {
         if (activity == null || pcmData == null || pcmData.length == 0) {
             callback.onError("录音数据为空");
             return;
         }
-        int durationSec = Math.max(1, (int) Math.ceil(pcmData.length / (sampleRate * 2.0)));
+        int durationSec = Math.max(1,
+                (int) Math.ceil(pcmData.length / (pcm16SampleRate * (double) PCM16_BYTES_PER_SAMPLE)));
         String pcmBase64 = android.util.Base64.encodeToString(pcmData, android.util.Base64.NO_WRAP);
         MAIN_HANDLER.post(() -> new FingerprintSession(activity, pcmBase64, durationSec, callback).start());
     }
@@ -67,7 +69,11 @@ public final class AudioFingerprintHelper {
             WebSettings settings = webView.getSettings();
             settings.setJavaScriptEnabled(true);
             settings.setAllowFileAccess(true);
+            settings.setAllowContentAccess(false);
             settings.setDomStorageEnabled(true);
+            settings.setBlockNetworkLoads(true);
+            settings.setAllowFileAccessFromFileURLs(false);
+            settings.setAllowUniversalAccessFromFileURLs(false);
             settings.setUserAgentString(
                     "Mozilla/5.0 (Linux; Android 8.1.0; Watch) AppleWebKit/537.36 " +
                             "(KHTML, like Gecko) Chrome/95.0.4638.69 Mobile Safari/537.36");

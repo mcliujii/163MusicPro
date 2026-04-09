@@ -10,6 +10,7 @@
     <script src="afp.js"></script>
     <script>
         function readPcm16Sample(binary, byteOffset) {
+            // Android AudioRecord returns 16-bit little-endian PCM.
             if (byteOffset + 1 >= binary.length) {
                 return 0;
             }
@@ -27,6 +28,9 @@
             }
             var outputSamples = Math.max(1, Math.ceil(inputSamples / 2));
             var result = new Float32Array(outputSamples);
+            // The reference demo resamples to 8k before fingerprinting.
+            // For the fixed 16k mono recorder here, averaging adjacent samples keeps the
+            // pipeline lightweight on watch hardware while matching the expected input rate.
             for (var i = 0, out = 0; out < outputSamples; out++, i += 2) {
                 var first = readPcm16Sample(binary, i * 2);
                 var mixed = first;
