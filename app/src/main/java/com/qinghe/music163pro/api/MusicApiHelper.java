@@ -18,6 +18,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -2179,7 +2180,7 @@ public class MusicApiHelper {
                     JSONObject dataObj = json.optJSONObject("data");
                     JSONArray resultArray = dataObj != null ? dataObj.optJSONArray("result") : null;
                     List<Song> matches = new ArrayList<>();
-                    java.util.LinkedHashSet<Long> seenSongIds = new java.util.LinkedHashSet<>();
+                    LinkedHashSet<Long> seenSongIds = new LinkedHashSet<>();
 
                     if (resultArray != null) {
                         for (int i = 0; i < resultArray.length(); i++) {

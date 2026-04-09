@@ -114,6 +114,7 @@
             <ImageView
                 android:layout_width="20dp"
                 android:layout_height="20dp"
+                android:contentDescription="听歌识曲"
                 android:src="@drawable/ic_audio_search"
                 android:alpha="0.7" />
             <TextView

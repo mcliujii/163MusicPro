@@ -105,6 +105,8 @@ public final class AudioFingerprintHelper {
             if (webView == null || finished) {
                 return;
             }
+            // Local assets (audio_fingerprint.html + afp.js + afp.wasm.js) perform
+            // the NetEase-compatible fingerprint generation inside an isolated WebView.
             String script = "window.generateFingerprintFromPcm(" + JSONObject.quote(pcmBase64) + ");";
             webView.evaluateJavascript(script, null);
         }

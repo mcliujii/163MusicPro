@@ -1,3 +1,4 @@
+/* Vendored AFP runtime from CeruMusic for NetEase audio fingerprint generation. */
 /* eslint-disable no-unreachable */
 'use strict'
 const WASM_BINARY_PLACEHOLDER = 'WASM_BINARY_PLACEHOLDER'
