@@ -18,6 +18,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
 
@@ -644,7 +645,7 @@ public class MusicPlayerManager {
 
     private void playNextSequential() {
         if (playlist.isEmpty()) return;
-        if (personalFmMode && currentIndex >= playlist.size() - 1) {
+        if (personalFmMode && currentIndex == playlist.size() - 1) {
             loadMorePersonalFmAndAdvance();
             return;
         }
@@ -667,7 +668,7 @@ public class MusicPlayerManager {
                 personalFmLoading = false;
                 int appended = appendUniqueSongs(songs);
                 if (appended > 0) {
-                    currentIndex++;
+                    currentIndex = (currentIndex + 1) % playlist.size();
                 } else {
                     currentIndex = (currentIndex + 1) % playlist.size();
                 }
@@ -691,7 +692,7 @@ public class MusicPlayerManager {
         if (songs == null || songs.isEmpty()) {
             return 0;
         }
-        java.util.HashSet<Long> existingIds = new java.util.HashSet<>();
+        HashSet<Long> existingIds = new HashSet<>();
         for (Song song : playlist) {
             existingIds.add(song.getId());
         }

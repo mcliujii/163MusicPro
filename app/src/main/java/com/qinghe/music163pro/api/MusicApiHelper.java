@@ -1433,6 +1433,7 @@ public class MusicApiHelper {
      * Get one personal FM batch.
      * (same as NeteaseCloudMusicApiBackup module/personal_fm.js)
      * Each request returns about 3 songs.
+     * Callers should request another batch when they need to extend the FM queue.
      */
     public static void getPersonalFM(String cookie, PersonalFMCallback callback) {
         executor.execute(() -> {
