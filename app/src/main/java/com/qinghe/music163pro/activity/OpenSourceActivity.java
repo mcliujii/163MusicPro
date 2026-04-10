@@ -36,47 +36,6 @@ public class OpenSourceActivity extends AppCompatActivity {
         content.addView(makeText(
                 "以下为本项目使用到的开源项目、开发者和 GitHub 链接。",
                 0xFFAAAAAA, px(15), false, Gravity.START));
-
-        addProject(content,
-                "NeteaseCloudMusicApiBackup",
-                "开发者：nooblong",
-                "https://github.com/nooblong/NeteaseCloudMusicApiBackup");
-
-        addProject(content,
-                "CeruMusic",
-                "开发者：timeshiftsauce",
-                "https://github.com/timeshiftsauce/CeruMusic");
-
-        addProject(content,
-                "AndroidX AppCompat",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/androidx");
-
-        addProject(content,
-                "AndroidX Core",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/androidx");
-
-        addProject(content,
-                "AndroidX Activity",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/androidx");
-
-        addProject(content,
-                "AndroidX ConstraintLayout",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/constraintlayout");
-
-        addProject(content,
-                "AndroidX RecyclerView",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/androidx");
-
-        addProject(content,
-                "AndroidX CardView",
-                "开发者：AndroidX / Google",
-                "https://github.com/androidx/androidx");
-
         addProject(content,
                 "Material Components for Android",
                 "开发者：Google",
