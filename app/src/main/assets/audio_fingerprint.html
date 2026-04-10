@@ -17,6 +17,7 @@
             var low = binary.charCodeAt(byteOffset) & 0xFF;
             var high = binary.charCodeAt(byteOffset + 1) & 0xFF;
             var value = (high << 8) | low;
+            // Convert unsigned 16-bit little-endian PCM to signed two's complement.
             return value >= 0x8000 ? value - 0x10000 : value;
         }
 

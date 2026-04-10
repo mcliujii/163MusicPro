@@ -68,6 +68,8 @@ public final class AudioFingerprintHelper {
             webView = new WebView(activity);
             WebSettings settings = webView.getSettings();
             settings.setJavaScriptEnabled(true);
+            // Local fingerprint assets are loaded from app assets, so file access is
+            // required for this isolated WebView even though network/content access stays blocked.
             settings.setAllowFileAccess(true);
             settings.setAllowContentAccess(false);
             settings.setDomStorageEnabled(true);

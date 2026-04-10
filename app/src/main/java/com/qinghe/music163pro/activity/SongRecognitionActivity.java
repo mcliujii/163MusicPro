@@ -239,7 +239,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
             return;
         }
 
-        int recordedSeconds = Math.max(1, (int) Math.ceil(pcm.length / (double) BYTES_PER_SECOND));
+        int recordedSeconds = calculateRecordedSeconds(pcm.length);
         if (recordedSeconds < MIN_SECONDS) {
             runOnUiThread(() -> {
                 if (sessionId != activeSessionId) return;
@@ -280,7 +280,7 @@ public class SongRecognitionActivity extends AppCompatActivity {
             if (sessionId != activeSessionId || recognitionSucceeded) {
                 return;
             }
-            int recordedSeconds = Math.max(1, (int) Math.ceil(totalBytes[0] / (double) BYTES_PER_SECOND));
+            int recordedSeconds = calculateRecordedSeconds(totalBytes[0]);
             if (recordedSeconds < MIN_SECONDS) {
                 finishRecognitionUi(true, false, "录音不能小于三秒", false);
                 Toast.makeText(this, "录音不能小于三秒", Toast.LENGTH_SHORT).show();
@@ -305,6 +305,9 @@ public class SongRecognitionActivity extends AppCompatActivity {
 
         try {
             synchronized (audioLock) {
+                // VOICE_RECOGNITION is preferred here over MIC because watch devices
+                // may expose built-in preprocessing for recognition scenarios, which
+                // helps reduce captured self-playback and ambient noise.
                 audioRecord = new AudioRecord(
                         MediaRecorder.AudioSource.VOICE_RECOGNITION,
                         SAMPLE_RATE,
@@ -586,6 +589,8 @@ public class SongRecognitionActivity extends AppCompatActivity {
 
     private void enableAudioEffects(int audioSessionId) {
         try {
+            // Some watches/ROMs do not expose these effects even when the API exists,
+            // so failures here are expected and should not break recording.
             if (AcousticEchoCanceler.isAvailable()) {
                 acousticEchoCanceler = AcousticEchoCanceler.create(audioSessionId);
                 if (acousticEchoCanceler != null) {
@@ -651,6 +656,10 @@ public class SongRecognitionActivity extends AppCompatActivity {
     private int px(int base) {
         int screenWidth = getResources().getDisplayMetrics().widthPixels;
         return (int) (base * screenWidth / 320f + 0.5f);
+    }
+
+    private int calculateRecordedSeconds(long totalBytes) {
+        return Math.max(1, (int) Math.ceil(totalBytes / (double) BYTES_PER_SECOND));
     }
 
     @Override
