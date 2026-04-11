@@ -34,6 +34,7 @@ public class MvPlayerActivity extends BaseWatchActivity {
     private String playbackUrl;
     private long playbackPosition;
     private boolean playWhenReady = true;
+    private boolean activityStarted;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -75,6 +76,11 @@ public class MvPlayerActivity extends BaseWatchActivity {
                     onError("MV地址为空");
                     return;
                 }
+                if (!activityStarted) {
+                    playbackUrl = url;
+                    showLoading(false, "");
+                    return;
+                }
                 startPlayback(url);
             }
 
@@ -97,7 +103,6 @@ public class MvPlayerActivity extends BaseWatchActivity {
             player.seekTo(playbackPosition);
         }
         player.setPlayWhenReady(playWhenReady);
-        player.play();
         showLoading(false, "");
     }
 
@@ -110,6 +115,7 @@ public class MvPlayerActivity extends BaseWatchActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        activityStarted = true;
         if (player == null && playbackUrl != null && !playbackUrl.isEmpty()) {
             startPlayback(playbackUrl);
         }
@@ -117,6 +123,7 @@ public class MvPlayerActivity extends BaseWatchActivity {
 
     @Override
     protected void onStop() {
+        activityStarted = false;
         super.onStop();
         releasePlayer();
     }
