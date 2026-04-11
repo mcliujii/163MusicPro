@@ -2,6 +2,7 @@ package com.qinghe.music163pro.util;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.util.LruCache;
 import android.widget.ImageView;
 
 import java.io.InputStream;
@@ -16,7 +17,14 @@ import java.util.concurrent.Executors;
 public final class NetworkImageLoader {
 
     private static final String TAG = "NetworkImageLoader";
-    private static final ExecutorService EXECUTOR = Executors.newCachedThreadPool();
+    private static final ExecutorService EXECUTOR = Executors.newFixedThreadPool(2);
+    private static final LruCache<String, Bitmap> MEMORY_CACHE =
+            new LruCache<String, Bitmap>((int) (Runtime.getRuntime().maxMemory() / 16)) {
+                @Override
+                protected int sizeOf(String key, Bitmap value) {
+                    return value != null ? value.getByteCount() : 0;
+                }
+            };
 
     private NetworkImageLoader() {
     }
@@ -30,8 +38,16 @@ public final class NetworkImageLoader {
         if (imageUrl == null || imageUrl.trim().isEmpty()) {
             return;
         }
+        Bitmap cached = MEMORY_CACHE.get(imageUrl);
+        if (cached != null) {
+            imageView.setImageBitmap(cached);
+            return;
+        }
         EXECUTOR.execute(() -> {
             Bitmap bitmap = downloadBitmap(imageUrl);
+            if (bitmap != null) {
+                MEMORY_CACHE.put(imageUrl, bitmap);
+            }
             imageView.post(() -> {
                 Object tag = imageView.getTag();
                 if (bitmap != null && imageUrl.equals(tag)) {
