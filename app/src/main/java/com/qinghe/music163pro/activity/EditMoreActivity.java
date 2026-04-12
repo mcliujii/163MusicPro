@@ -10,6 +10,7 @@ import android.widget.TextView;
 import com.google.android.material.switchmaterial.SwitchMaterial;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.MoreMenuPreferences;
+import com.qinghe.music163pro.util.WatchUiUtils;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,17 +52,17 @@ public class EditMoreActivity extends BaseWatchActivity {
     private LinearLayout createSwitchRow(SharedPreferences prefs, String key, String label) {
         LinearLayout row = new LinearLayout(this);
         row.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(56)));
+                ViewGroup.LayoutParams.MATCH_PARENT, WatchUiUtils.px(this, 56)));
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(px(16), 0, px(12), 0);
+        row.setPadding(WatchUiUtils.px(this, 16), 0, WatchUiUtils.px(this, 12), 0);
         row.setBackgroundResource(android.R.drawable.list_selector_background);
 
         TextView tvLabel = new TextView(this);
         tvLabel.setLayoutParams(new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f));
         tvLabel.setText(label);
         tvLabel.setTextColor(getResources().getColor(R.color.text_primary));
-        tvLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, px(14));
+        tvLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_PX, WatchUiUtils.px(this, 14));
         row.addView(tvLabel);
 
         SwitchMaterial toggle = new SwitchMaterial(this);
