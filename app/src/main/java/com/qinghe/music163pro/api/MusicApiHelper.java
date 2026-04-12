@@ -44,6 +44,8 @@ public class MusicApiHelper {
     private static final String DOMAIN = "https://music.163.com";
     private static final String API_DOMAIN = "https://interface.music.163.com";
     private static final String SONG_COMMENT_THREAD_PREFIX = "R_SO_4_";
+    private static final String CLOUD_UPLOAD_BUCKET = "jd-musicrep-privatecloud-audio-public";
+    private static final String DEFAULT_CLOUD_BITRATE = "999000";
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
@@ -1746,7 +1748,7 @@ public class MusicApiHelper {
                 String filenameBase = buildUploadFilename(originalName, ext);
 
                 JSONObject checkData = new JSONObject();
-                checkData.put("bitrate", "999000");
+                checkData.put("bitrate", DEFAULT_CLOUD_BITRATE);
                 checkData.put("ext", "");
                 checkData.put("length", size);
                 checkData.put("md5", md5);
@@ -1761,7 +1763,7 @@ public class MusicApiHelper {
 
                 updateUploadProgress(callback, 20, "正在申请上传凭证...");
                 JSONObject tokenData = new JSONObject();
-                tokenData.put("bucket", "jd-musicrep-privatecloud-audio-public");
+                tokenData.put("bucket", CLOUD_UPLOAD_BUCKET);
                 tokenData.put("ext", ext);
                 tokenData.put("filename", filenameBase);
                 tokenData.put("local", false);
@@ -1777,7 +1779,7 @@ public class MusicApiHelper {
                 }
 
                 updateUploadProgress(callback, 30, "正在连接上传节点...");
-                String lbsResponse = getRaw("https://wanproxy.127.net/lbs?version=1.0&bucketname=jd-musicrep-privatecloud-audio-public");
+                String lbsResponse = getRaw("https://wanproxy.127.net/lbs?version=1.0&bucketname=" + CLOUD_UPLOAD_BUCKET);
                 JSONObject lbsJson = new JSONObject(lbsResponse);
                 JSONArray uploadHosts = lbsJson.optJSONArray("upload");
                 if (uploadHosts == null || uploadHosts.length() == 0) {
@@ -1786,7 +1788,7 @@ public class MusicApiHelper {
                 }
 
                 String objectKey = tokenResult.optString("objectKey", "").replace("/", "%2F");
-                String uploadUrl = uploadHosts.optString(0, "") + "/jd-musicrep-privatecloud-audio-public/" + objectKey
+                String uploadUrl = uploadHosts.optString(0, "") + "/" + CLOUD_UPLOAD_BUCKET + "/" + objectKey
                         + "?offset=0&complete=true&version=1.0";
                 uploadFileToNos(uploadUrl, tokenResult.optString("token", ""), md5, uploadFile, callback);
 
@@ -1798,7 +1800,7 @@ public class MusicApiHelper {
                 infoData.put("song", stripExtension(originalName));
                 infoData.put("album", "未知专辑");
                 infoData.put("artist", "未知艺术家");
-                infoData.put("bitrate", "999000");
+                infoData.put("bitrate", DEFAULT_CLOUD_BITRATE);
                 infoData.put("resourceId", tokenResult.optString("resourceId", ""));
                 String infoResponse = eapiPost("/api/upload/cloud/info/v2", infoData.toString(), cookie);
                 JSONObject infoJson = new JSONObject(infoResponse);
@@ -2880,14 +2882,14 @@ public class MusicApiHelper {
             item.setArtist(parsedSong.getArtist());
             item.setAlbum(parsedSong.getAlbum());
         }
-        boolean isMusic = hasSimpleSong;
-        if (isMusic && (item.getSongName() == null || item.getSongName().isEmpty())
+        boolean classifyAsMusic = hasSimpleSong;
+        if (classifyAsMusic && (item.getSongName() == null || item.getSongName().isEmpty())
                 && item.getFileName() != null && !item.getFileName().isEmpty()) {
             item.setSongName(stripExtension(item.getFileName()));
         }
         String extension = getFileExtension(item.getFileName());
         item.setFileExtension(extension);
-        item.setMusic(isMusic);
+        item.setMusic(classifyAsMusic);
         if (item.getDownloadUrl() == null || item.getDownloadUrl().isEmpty()) {
             item.setDownloadUrl(firstNonEmptyUrl(simpleSong,
                     "url", "downloadUrl", "mp3Url"));

@@ -23,6 +23,7 @@ public class NeteaseApiCrypto {
     private static final String IV = "0102030405060708";
     private static final String PRESET_KEY = "0CoJUm6Qyw8W8jud";
     private static final String BASE62 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    // Official NetEase eapi protocol constants; these are compatibility values, not app secrets.
     private static final String EAPI_KEY = "e82ckenh8dichen8";
     private static final String EAPI_MAGIC = "-36cd479b6b5-";
 
