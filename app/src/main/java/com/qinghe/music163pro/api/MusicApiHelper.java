@@ -2750,10 +2750,17 @@ public class MusicApiHelper {
         if (jsonObject == null || path == null || path.isEmpty()) {
             return "";
         }
-        if (!path.contains(".")) {
-            return jsonObject.optString(path, "");
+        String normalizedPath = path.trim();
+        if (normalizedPath.isEmpty()) {
+            return "";
         }
-        String[] parts = path.split("\\.");
+        if (!normalizedPath.contains(".")) {
+            return jsonObject.optString(normalizedPath, "");
+        }
+        String[] parts = normalizedPath.split("\\.");
+        if (parts.length == 0) {
+            return "";
+        }
         JSONObject current = jsonObject;
         for (int i = 0; i < parts.length - 1; i++) {
             current = current.optJSONObject(parts[i]);

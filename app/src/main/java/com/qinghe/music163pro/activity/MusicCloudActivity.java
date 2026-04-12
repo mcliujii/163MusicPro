@@ -213,7 +213,7 @@ public class MusicCloudActivity extends BaseWatchActivity {
                     throw new IllegalStateException("无法创建下载目录");
                 }
                 String safeName = sanitizeFileName(name);
-                if (!safeName.contains(".")) {
+                if (!hasExtension(safeName)) {
                     safeName += ".bin";
                 }
                 File outputFile = new File(dir, safeName);
@@ -328,6 +328,14 @@ public class MusicCloudActivity extends BaseWatchActivity {
             return "cloud_file.bin";
         }
         return fileName.replaceAll("[\\\\/:*?\"<>|]", "_");
+    }
+
+    private boolean hasExtension(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return false;
+        }
+        int dotIndex = fileName.lastIndexOf('.');
+        return dotIndex > 0 && dotIndex < fileName.length() - 1;
     }
 
     private void showConfirmDialog(String title, String message, Runnable onConfirm) {
