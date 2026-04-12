@@ -13,8 +13,10 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.MoreMenuPreferences;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +33,19 @@ public class MoreActivity extends AppCompatActivity {
     private View btnProfile;
     private View btnPersonalFM;
     private View btnMyPlaylists;
+    private View btnDailyRecommend;
+    private View btnRadarPlaylist;
+    private View btnMusicCloud;
+    private View btnFavorites;
+    private View btnSearch;
+    private View btnSongRecognition;
+    private View btnDownloads;
+    private View btnRingtones;
+    private View btnTopList;
+    private View btnHistory;
+    private View btnLogin;
     private GestureDetector gestureDetector;
+    private SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -39,22 +53,25 @@ public class MoreActivity extends AppCompatActivity {
         setContentView(R.layout.activity_more);
 
         // Apply keep screen on setting
-        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        prefs = getSharedPreferences(MoreMenuPreferences.PREFS_NAME, MODE_PRIVATE);
         if (prefs.getBoolean("keep_screen_on", false)) {
             getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
 
-        View btnFavorites = findViewById(R.id.btn_menu_favorites);
+        btnFavorites = findViewById(R.id.btn_menu_favorites);
         btnMyPlaylists = findViewById(R.id.btn_menu_my_playlists);
-        View btnSearch = findViewById(R.id.btn_menu_search);
-        View btnSongRecognition = findViewById(R.id.btn_menu_song_recognition);
-        View btnDownloads = findViewById(R.id.btn_menu_downloads);
-        View btnRingtones = findViewById(R.id.btn_menu_ringtones);
-        View btnTopList = findViewById(R.id.btn_menu_toplist);
-        View btnHistory = findViewById(R.id.btn_menu_history);
+        btnDailyRecommend = findViewById(R.id.btn_menu_daily_recommend);
+        btnRadarPlaylist = findViewById(R.id.btn_menu_radar_playlist);
+        btnMusicCloud = findViewById(R.id.btn_menu_music_cloud);
+        btnSearch = findViewById(R.id.btn_menu_search);
+        btnSongRecognition = findViewById(R.id.btn_menu_song_recognition);
+        btnDownloads = findViewById(R.id.btn_menu_downloads);
+        btnRingtones = findViewById(R.id.btn_menu_ringtones);
+        btnTopList = findViewById(R.id.btn_menu_toplist);
+        btnHistory = findViewById(R.id.btn_menu_history);
         btnProfile = findViewById(R.id.btn_menu_profile);
         btnPersonalFM = findViewById(R.id.btn_menu_personal_fm);
-        View btnLogin = findViewById(R.id.btn_menu_login);
+        btnLogin = findViewById(R.id.btn_menu_login);
         View btnSettings = findViewById(R.id.btn_menu_settings);
 
         btnFavorites.setOnClickListener(v ->
@@ -62,6 +79,14 @@ public class MoreActivity extends AppCompatActivity {
 
         btnMyPlaylists.setOnClickListener(v ->
                 startActivity(new Intent(this, MyPlaylistsActivity.class)));
+
+        btnDailyRecommend.setOnClickListener(v ->
+                startActivity(new Intent(this, DailyRecommendActivity.class)));
+
+        btnRadarPlaylist.setOnClickListener(v -> openRadarPlaylist());
+
+        btnMusicCloud.setOnClickListener(v ->
+                startActivity(new Intent(this, MusicCloudActivity.class)));
 
         btnSearch.setOnClickListener(v ->
                 startActivity(new Intent(this, SearchActivity.class)));
@@ -119,14 +144,42 @@ public class MoreActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         updateLoginDependentVisibility();
+        updateMenuVisibility();
     }
 
     private void updateLoginDependentVisibility() {
         String cookie = MusicPlayerManager.getInstance().getCookie();
         boolean loggedIn = cookie != null && !cookie.isEmpty() && cookie.contains("MUSIC_U");
-        btnProfile.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
-        btnPersonalFM.setVisibility(View.VISIBLE);
-        btnMyPlaylists.setVisibility(loggedIn ? View.VISIBLE : View.GONE);
+        btnProfile.setTag(loggedIn);
+        btnMyPlaylists.setTag(loggedIn);
+        btnDailyRecommend.setTag(loggedIn);
+        btnRadarPlaylist.setTag(loggedIn);
+        btnMusicCloud.setTag(loggedIn);
+        btnPersonalFM.setTag(true);
+        btnLogin.setTag(true);
+    }
+
+    private void updateMenuVisibility() {
+        applyVisibility(btnFavorites, MoreMenuPreferences.KEY_FAVORITES, false);
+        applyVisibility(btnMyPlaylists, MoreMenuPreferences.KEY_MY_PLAYLISTS, true);
+        applyVisibility(btnDailyRecommend, MoreMenuPreferences.KEY_DAILY_RECOMMEND, true);
+        applyVisibility(btnRadarPlaylist, MoreMenuPreferences.KEY_RADAR_PLAYLIST, true);
+        applyVisibility(btnMusicCloud, MoreMenuPreferences.KEY_MUSIC_CLOUD, true);
+        applyVisibility(btnSearch, MoreMenuPreferences.KEY_SEARCH, false);
+        applyVisibility(btnSongRecognition, MoreMenuPreferences.KEY_SONG_RECOGNITION, false);
+        applyVisibility(btnDownloads, MoreMenuPreferences.KEY_DOWNLOADS, false);
+        applyVisibility(btnRingtones, MoreMenuPreferences.KEY_RINGTONES, false);
+        applyVisibility(btnTopList, MoreMenuPreferences.KEY_TOPLIST, false);
+        applyVisibility(btnHistory, MoreMenuPreferences.KEY_HISTORY, false);
+        applyVisibility(btnProfile, MoreMenuPreferences.KEY_PROFILE, true);
+        applyVisibility(btnPersonalFM, MoreMenuPreferences.KEY_PERSONAL_FM, false);
+        applyVisibility(btnLogin, MoreMenuPreferences.KEY_LOGIN, false);
+    }
+
+    private void applyVisibility(View target, String key, boolean requireLogin) {
+        boolean enabled = MoreMenuPreferences.isEnabled(prefs, key);
+        boolean loggedIn = !requireLogin || Boolean.TRUE.equals(target.getTag());
+        target.setVisibility(enabled && loggedIn ? View.VISIBLE : View.GONE);
     }
 
     private void startPersonalFM() {
@@ -146,6 +199,33 @@ public class MoreActivity extends AppCompatActivity {
                 intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
                 startActivity(intent);
                 finish();
+            }
+
+            @Override
+            public void onError(String message) {
+                Toast.makeText(MoreActivity.this, "获取失败: " + message, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void openRadarPlaylist() {
+        String cookie = MusicPlayerManager.getInstance().getCookie();
+        if (cookie == null || cookie.isEmpty() || !cookie.contains("MUSIC_U")) {
+            Toast.makeText(this, "请先登录", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Toast.makeText(this, "正在获取雷达歌单...", Toast.LENGTH_SHORT).show();
+        MusicApiHelper.getRadarPlaylist(cookie, new MusicApiHelper.DailyRecommendPlaylistCallback() {
+            @Override
+            public void onResult(PlaylistInfo playlist) {
+                Intent intent = new Intent(MoreActivity.this, PlaylistDetailActivity.class);
+                intent.putExtra("playlist_id", playlist.getId());
+                intent.putExtra("playlist_name", playlist.getName());
+                intent.putExtra("track_count", playlist.getTrackCount());
+                intent.putExtra("creator", playlist.getCreator());
+                intent.putExtra("creator_user_id", playlist.getUserId());
+                intent.putExtra("is_liked_playlist", playlist.isLikedPlaylist());
+                startActivity(intent);
             }
 
             @Override

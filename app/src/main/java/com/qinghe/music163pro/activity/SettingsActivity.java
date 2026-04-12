@@ -32,12 +32,16 @@ public class SettingsActivity extends AppCompatActivity {
         }
 
         View btnToggle = findViewById(R.id.btn_settings_toggle);
+        View btnEditMore = findViewById(R.id.btn_settings_edit_more);
         View btnCheckUpdate = findViewById(R.id.btn_settings_check_update);
         View btnAbout = findViewById(R.id.btn_settings_about);
         View btnOpenSource = findViewById(R.id.btn_settings_open_source);
 
         btnToggle.setOnClickListener(v ->
                 startActivity(new Intent(this, ToggleSettingsActivity.class)));
+
+        btnEditMore.setOnClickListener(v ->
+                startActivity(new Intent(this, EditMoreActivity.class)));
 
         btnCheckUpdate.setOnClickListener(v -> checkUpdateManually());
 
