@@ -4,6 +4,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import com.qinghe.music163pro.model.CloudItem;
 import com.qinghe.music163pro.model.MvInfo;
 import com.qinghe.music163pro.model.PlaylistInfo;
 import com.qinghe.music163pro.model.Song;
@@ -13,11 +14,15 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -37,7 +42,10 @@ public class MusicApiHelper {
 
     private static final String WEAPI_BASE = "https://music.163.com/weapi";
     private static final String DOMAIN = "https://music.163.com";
+    private static final String API_DOMAIN = "https://interface.music.163.com";
     private static final String SONG_COMMENT_THREAD_PREFIX = "R_SO_4_";
+    private static final String CLOUD_UPLOAD_BUCKET = "jd-musicrep-privatecloud-audio-public";
+    private static final String DEFAULT_CLOUD_BITRATE = "999000";
 
     private static final String USER_AGENT =
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 " +
@@ -241,6 +249,27 @@ public class MusicApiHelper {
     /** Callback for playlist detail that also returns metadata */
     public interface PlaylistDetailWithMetaCallback {
         void onResult(List<Song> songs, int trackCount, String creator, long creatorUserId, int specialType, boolean subscribed);
+        void onError(String message);
+    }
+
+    public interface DailyRecommendPlaylistCallback {
+        void onResult(PlaylistInfo playlist);
+        void onError(String message);
+    }
+
+    public interface CloudItemsCallback {
+        void onResult(List<CloudItem> items);
+        void onError(String message);
+    }
+
+    public interface CloudItemCallback {
+        void onResult(CloudItem item);
+        void onError(String message);
+    }
+
+    public interface UploadProgressCallback {
+        void onProgress(int progress, String message);
+        void onSuccess(String message);
         void onError(String message);
     }
 
@@ -1553,6 +1582,251 @@ public class MusicApiHelper {
         });
     }
 
+    // ==================== Daily Recommend ====================
+
+    public static void getDailyRecommendSongs(String cookie, SearchCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/v3/discovery/recommend/songs", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONObject dataObj = json.optJSONObject("data");
+                JSONArray songsArray = dataObj != null ? dataObj.optJSONArray("dailySongs") : null;
+                if (songsArray == null) {
+                    songsArray = json.optJSONArray("recommend");
+                }
+                List<Song> songs = new ArrayList<>();
+                if (songsArray != null) {
+                    for (int i = 0; i < songsArray.length(); i++) {
+                        Song song = parseSongFromJson(songsArray.optJSONObject(i));
+                        if (song != null) {
+                            songs.add(song);
+                        }
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(songs));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取每日推荐歌曲失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public static void getRadarPlaylist(String cookie, DailyRecommendPlaylistCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("csrf_token", extractCsrfToken(cookie));
+                String response = weapiPost("/api/v1/discovery/recommend/resource", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray recommend = json.optJSONArray("recommend");
+                if (recommend == null || recommend.length() == 0) {
+                    mainHandler.post(() -> callback.onError("暂无推荐歌单"));
+                    return;
+                }
+                PlaylistInfo fallback = null;
+                PlaylistInfo radar = null;
+                for (int i = 0; i < recommend.length(); i++) {
+                    JSONObject item = recommend.optJSONObject(i);
+                    if (item == null) {
+                        continue;
+                    }
+                    PlaylistInfo playlistInfo = parsePlaylistInfo(item);
+                    if (playlistInfo == null) {
+                        continue;
+                    }
+                    if (fallback == null) {
+                        fallback = playlistInfo;
+                    }
+                    String name = playlistInfo.getName();
+                    String copywriter = item.optString("copywriter", "");
+                    if ((name != null && name.contains("雷达"))
+                            || (copywriter != null && copywriter.contains("雷达"))) {
+                        radar = playlistInfo;
+                        break;
+                    }
+                }
+                PlaylistInfo result = radar != null ? radar : fallback;
+                if (result == null) {
+                    mainHandler.post(() -> callback.onError("暂无推荐歌单"));
+                } else {
+                    mainHandler.post(() -> callback.onResult(result));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取雷达歌单失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    // ==================== Music Cloud ====================
+
+    public static void getCloudItems(String cookie, CloudItemsCallback callback) {
+        executor.execute(() -> {
+            try {
+                List<CloudItem> result = new ArrayList<>();
+                int offset = 0;
+                boolean hasMore = true;
+                while (hasMore) {
+                    JSONObject data = new JSONObject();
+                    data.put("limit", 200);
+                    data.put("offset", offset);
+                    String response = weapiPost("/api/v1/cloud/get", data.toString(), cookie);
+                    JSONObject json = new JSONObject(response);
+                    JSONArray items = json.optJSONArray("data");
+                    if (items == null || items.length() == 0) {
+                        break;
+                    }
+                    for (int i = 0; i < items.length(); i++) {
+                        CloudItem cloudItem = parseCloudItem(items.optJSONObject(i));
+                        if (cloudItem != null) {
+                            result.add(cloudItem);
+                        }
+                    }
+                    hasMore = json.optBoolean("hasMore", false);
+                    offset += items.length();
+                }
+                mainHandler.post(() -> callback.onResult(result));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取音乐云盘失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public static void getCloudItemDetail(long cloudSongId, String cookie, CloudItemCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("songIds", new org.json.JSONArray().put(cloudSongId));
+                String response = weapiPost("/api/v1/cloud/get/byids", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                JSONArray list = json.optJSONArray("data");
+                CloudItem item = (list != null && list.length() > 0)
+                        ? parseCloudItem(list.optJSONObject(0)) : null;
+                if (item == null) {
+                    mainHandler.post(() -> callback.onError("未找到云盘文件"));
+                } else {
+                    mainHandler.post(() -> callback.onResult(item));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "获取云盘详情失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public static void deleteCloudItem(long cloudSongId, String cookie, PlaylistActionCallback callback) {
+        executor.execute(() -> {
+            try {
+                JSONObject data = new JSONObject();
+                data.put("songIds", new org.json.JSONArray().put(cloudSongId));
+                String response = weapiPost("/api/cloud/del", data.toString(), cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                mainHandler.post(() -> callback.onResult(code == 200));
+            } catch (Exception e) {
+                MusicLog.w(TAG, "删除云盘文件失败: " + cloudSongId, e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
+    public static void uploadCloudFile(File uploadFile, String originalName, boolean musicFile,
+                                       String cookie, UploadProgressCallback callback) {
+        executor.execute(() -> {
+            try {
+                if (uploadFile == null || !uploadFile.exists() || uploadFile.length() <= 0) {
+                    mainHandler.post(() -> callback.onError("文件无效"));
+                    return;
+                }
+                updateUploadProgress(callback, 5, "正在校验文件...");
+                String ext = getFileExtension(originalName);
+                String md5 = md5(uploadFile);
+                long size = uploadFile.length();
+                String filenameBase = buildUploadFilename(originalName, ext);
+
+                JSONObject checkData = new JSONObject();
+                checkData.put("bitrate", DEFAULT_CLOUD_BITRATE);
+                checkData.put("ext", "");
+                checkData.put("length", size);
+                checkData.put("md5", md5);
+                checkData.put("songId", "0");
+                checkData.put("version", 1);
+                String uploadCheckResponse = eapiPost("/api/cloud/upload/check", checkData.toString(), cookie);
+                JSONObject checkJson = new JSONObject(uploadCheckResponse);
+                if (checkJson.optInt("code", -1) != 200) {
+                    mainHandler.post(() -> callback.onError(checkJson.optString("message", "上传校验失败")));
+                    return;
+                }
+
+                updateUploadProgress(callback, 20, "正在申请上传凭证...");
+                JSONObject tokenData = new JSONObject();
+                tokenData.put("bucket", CLOUD_UPLOAD_BUCKET);
+                tokenData.put("ext", ext);
+                tokenData.put("filename", filenameBase);
+                tokenData.put("local", false);
+                tokenData.put("nos_product", 3);
+                tokenData.put("type", "audio");
+                tokenData.put("md5", md5);
+                String uploadTokenResponse = weapiPost("/api/nos/token/alloc", tokenData.toString(), cookie);
+                JSONObject tokenJson = new JSONObject(uploadTokenResponse);
+                JSONObject tokenResult = tokenJson.optJSONObject("result");
+                if (tokenResult == null) {
+                    mainHandler.post(() -> callback.onError("上传凭证获取失败"));
+                    return;
+                }
+
+                updateUploadProgress(callback, 30, "正在连接上传节点...");
+                String lbsResponse = getRaw("https://wanproxy.127.net/lbs?version=1.0&bucketname=" + CLOUD_UPLOAD_BUCKET);
+                JSONObject lbsJson = new JSONObject(lbsResponse);
+                JSONArray uploadHosts = lbsJson.optJSONArray("upload");
+                if (uploadHosts == null || uploadHosts.length() == 0) {
+                    mainHandler.post(() -> callback.onError("上传节点获取失败"));
+                    return;
+                }
+
+                String objectKey = tokenResult.optString("objectKey", "").replace("/", "%2F");
+                String uploadUrl = uploadHosts.optString(0, "") + "/" + CLOUD_UPLOAD_BUCKET + "/" + objectKey
+                        + "?offset=0&complete=true&version=1.0";
+                uploadFileToNos(uploadUrl, tokenResult.optString("token", ""), md5, uploadFile, callback);
+
+                updateUploadProgress(callback, 92, "正在提交云盘信息...");
+                JSONObject infoData = new JSONObject();
+                infoData.put("md5", md5);
+                infoData.put("songid", checkJson.optString("songId", "0"));
+                infoData.put("filename", originalName);
+                infoData.put("song", stripExtension(originalName));
+                infoData.put("album", "未知专辑");
+                infoData.put("artist", "未知艺术家");
+                infoData.put("bitrate", DEFAULT_CLOUD_BITRATE);
+                infoData.put("resourceId", tokenResult.optString("resourceId", ""));
+                String infoResponse = eapiPost("/api/upload/cloud/info/v2", infoData.toString(), cookie);
+                JSONObject infoJson = new JSONObject(infoResponse);
+                if (infoJson.optInt("code", -1) != 200) {
+                    mainHandler.post(() -> callback.onError(infoJson.optString("message", "云盘信息提交失败")));
+                    return;
+                }
+                long songId = infoJson.optLong("songId", 0);
+
+                JSONObject pubData = new JSONObject();
+                pubData.put("songid", songId);
+                String pubResponse = eapiPost("/api/cloud/pub/v2", pubData.toString(), cookie);
+                JSONObject pubJson = new JSONObject(pubResponse);
+                int code = pubJson.optInt("code", -1);
+                if (code == 200) {
+                    mainHandler.post(() -> callback.onSuccess("上传成功"));
+                } else {
+                    mainHandler.post(() -> callback.onError(pubJson.optString("message", "上传失败")));
+                }
+            } catch (Exception e) {
+                MusicLog.w(TAG, "上传云盘文件失败", e);
+                mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "未知错误"));
+            }
+        });
+    }
+
     // ==================== Personal FM ====================
 
     /**
@@ -2111,6 +2385,59 @@ public class MusicApiHelper {
         }
     }
 
+    private static String eapiPost(String apiPath, String jsonData, String cookie) throws Exception {
+        JSONObject data = new JSONObject(jsonData);
+        JSONObject header = buildEapiHeader(cookie);
+        data.put("header", header);
+        data.put("e_r", false);
+
+        String params = NeteaseApiCrypto.eapi(apiPath, data.toString());
+        String postBody = "params=" + URLEncoder.encode(params, "UTF-8");
+
+        String eapiPath = apiPath.replaceFirst("^/api/", "/eapi/");
+        String urlStr = API_DOMAIN + eapiPath;
+        MusicLog.i(TAG, "[REQ] POST(eapi) " + urlStr + "\n  请求体(原文): " + jsonData);
+
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("User-Agent", "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)");
+        conn.setRequestProperty("Referer", DOMAIN);
+        conn.setRequestProperty("Origin", DOMAIN);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Cookie", buildEapiCookie(cookie, header));
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setDoOutput(true);
+
+        try {
+            OutputStream os = conn.getOutputStream();
+            os.write(postBody.getBytes("UTF-8"));
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+            BufferedReader reader;
+            if (responseCode >= 200 && responseCode < 400) {
+                reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            } else {
+                InputStream errStream = conn.getErrorStream();
+                reader = new BufferedReader(new InputStreamReader(
+                        errStream != null ? errStream : conn.getInputStream(), "UTF-8"));
+            }
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            String responseBody = sb.toString();
+            MusicLog.api(TAG, "POST(eapi)", urlStr, responseCode, responseBody);
+            return responseBody;
+        } finally {
+            conn.disconnect();
+        }
+    }
+
     /**
      * Build a cookie string with Android mobile device identity.
      * Used for SMS login to avoid "环境不安全" error.
@@ -2175,6 +2502,110 @@ public class MusicApiHelper {
         sb.append("channel=").append(CHANNEL).append("; ");
         sb.append("appver=").append(APP_VER);
         return sb.toString();
+    }
+
+    private static JSONObject buildEapiHeader(String existingCookie) throws org.json.JSONException {
+        JSONObject header = new JSONObject();
+        JSONObject cookieMap = parseCookieString(existingCookie);
+        header.put("osver", cookieMap.optString("osver", OS_VER));
+        header.put("deviceId", cookieMap.optString("deviceId", deviceId));
+        header.put("os", cookieMap.optString("os", OS_TYPE));
+        header.put("appver", cookieMap.optString("appver", APP_VER));
+        header.put("versioncode", cookieMap.optString("versioncode", VERSION_CODE));
+        header.put("mobilename", cookieMap.optString("mobilename", ""));
+        header.put("buildver", cookieMap.optString("buildver", String.valueOf(System.currentTimeMillis() / 1000L)));
+        header.put("resolution", cookieMap.optString("resolution", "320x360"));
+        header.put("__csrf", cookieMap.optString("__csrf", extractCsrfToken(existingCookie)));
+        header.put("channel", cookieMap.optString("channel", CHANNEL));
+        header.put("requestId", buildRequestId());
+        String musicU = cookieMap.optString("MUSIC_U", "");
+        if (!musicU.isEmpty()) {
+            header.put("MUSIC_U", musicU);
+        }
+        String musicA = cookieMap.optString("MUSIC_A", "");
+        if (!musicA.isEmpty()) {
+            header.put("MUSIC_A", musicA);
+        }
+        return header;
+    }
+
+    private static String buildEapiCookie(String existingCookie, JSONObject header) {
+        StringBuilder sb = new StringBuilder();
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        keys.add("__remember_me");
+        keys.add("ntes_kaola_ad");
+        keys.add("WEVNSM");
+        keys.add("osver");
+        keys.add("deviceId");
+        keys.add("os");
+        keys.add("appver");
+        keys.add("versioncode");
+        keys.add("mobilename");
+        keys.add("buildver");
+        keys.add("resolution");
+        keys.add("__csrf");
+        keys.add("channel");
+        keys.add("requestId");
+        keys.add("MUSIC_U");
+        keys.add("MUSIC_A");
+
+        for (String key : keys) {
+            String value;
+            switch (key) {
+                case "__remember_me":
+                    value = "true";
+                    break;
+                case "ntes_kaola_ad":
+                    value = "1";
+                    break;
+                case "WEVNSM":
+                    value = "1.0.0";
+                    break;
+                default:
+                    value = header.optString(key, "");
+                    break;
+            }
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append("; ");
+            }
+            sb.append(URLEncoder_safe(key)).append("=").append(URLEncoder_safe(value));
+        }
+        return sb.toString();
+    }
+
+    private static JSONObject parseCookieString(String cookie) {
+        JSONObject result = new JSONObject();
+        if (cookie == null || cookie.trim().isEmpty()) {
+            return result;
+        }
+        String[] parts = cookie.split(";");
+        for (String part : parts) {
+            if (part == null) {
+                continue;
+            }
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int index = trimmed.indexOf('=');
+            if (index <= 0) {
+                continue;
+            }
+            String key = trimmed.substring(0, index).trim();
+            String value = trimmed.substring(index + 1).trim();
+            try {
+                result.put(key, value);
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
+    }
+
+    private static String buildRequestId() {
+        return System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
     }
 
     private static String URLEncoder_safe(String s) {
@@ -2378,6 +2809,247 @@ public class MusicApiHelper {
                 mainHandler.post(() -> callback.onError(e.getMessage() != null ? e.getMessage() : "识别失败，请重试"));
             }
         });
+    }
+
+    private static Song parseSongFromJson(JSONObject songObj) {
+        if (songObj == null) {
+            return null;
+        }
+        long songId = songObj.optLong("id", songObj.optLong("songId", 0));
+        String songName = pickFirstNonEmpty(songObj, "name", "songName");
+        JSONArray artists = songObj.optJSONArray("ar");
+        if (artists == null) {
+            artists = songObj.optJSONArray("artists");
+        }
+        if (artists == null) {
+            artists = songObj.optJSONArray("artist");
+        }
+        String artist = joinArtistNames(artists);
+        if (artist.isEmpty()) {
+            artist = pickFirstNonEmpty(songObj, "artist", "artistName");
+        }
+        JSONObject albumObj = songObj.optJSONObject("al");
+        if (albumObj == null) {
+            albumObj = songObj.optJSONObject("album");
+        }
+        String album = albumObj != null ? albumObj.optString("name", "") : "";
+        if (songName.isEmpty()) {
+            songName = pickFirstNonEmpty(songObj, "fileName");
+        }
+        if (songName.isEmpty()) {
+            return null;
+        }
+        return new Song(songId, songName, artist, album);
+    }
+
+    private static PlaylistInfo parsePlaylistInfo(JSONObject playlistObj) {
+        if (playlistObj == null) {
+            return null;
+        }
+        long playlistId = playlistObj.optLong("id", 0);
+        if (playlistId <= 0) {
+            return null;
+        }
+        String name = playlistObj.optString("name", "");
+        int trackCount = playlistObj.optInt("trackCount", 0);
+        String creator = "";
+        long creatorUserId = 0;
+        JSONObject creatorObj = playlistObj.optJSONObject("creator");
+        if (creatorObj != null) {
+            creator = creatorObj.optString("nickname", "");
+            creatorUserId = creatorObj.optLong("userId", 0);
+        }
+        boolean subscribed = playlistObj.optBoolean("subscribed", false);
+        String specialType = String.valueOf(playlistObj.optInt("specialType", 0));
+        return new PlaylistInfo(playlistId, name, trackCount, creator, creatorUserId, subscribed, specialType);
+    }
+
+    private static CloudItem parseCloudItem(JSONObject itemObj) {
+        if (itemObj == null) {
+            return null;
+        }
+        CloudItem item = new CloudItem();
+        long cloudSongId = itemObj.optLong("songId", itemObj.optLong("id", 0));
+        item.setCloudSongId(cloudSongId);
+        item.setFileName(pickFirstNonEmpty(itemObj, "fileName", "songName", "name"));
+        item.setFileSize(itemObj.optLong("fileSize", itemObj.optLong("size", 0)));
+        item.setDownloadUrl(firstNonEmptyUrl(itemObj,
+                "url", "downloadUrl", "simpleSong.url"));
+
+        JSONObject simpleSong = itemObj.optJSONObject("simpleSong");
+        boolean hasSimpleSong = simpleSong != null && simpleSong.length() > 0;
+        Song parsedSong = parseSongFromJson(simpleSong != null ? simpleSong : itemObj);
+        if (parsedSong != null && hasSimpleSong) {
+            item.setSongId(parsedSong.getId());
+            item.setSongName(parsedSong.getName());
+            item.setArtist(parsedSong.getArtist());
+            item.setAlbum(parsedSong.getAlbum());
+        }
+        boolean classifyAsMusic = hasSimpleSong;
+        if (classifyAsMusic && (item.getSongName() == null || item.getSongName().isEmpty())
+                && item.getFileName() != null && !item.getFileName().isEmpty()) {
+            item.setSongName(stripExtension(item.getFileName()));
+        }
+        String extension = getFileExtension(item.getFileName());
+        item.setFileExtension(extension);
+        item.setMusic(classifyAsMusic);
+        if (item.getDownloadUrl() == null || item.getDownloadUrl().isEmpty()) {
+            item.setDownloadUrl(firstNonEmptyUrl(simpleSong,
+                    "url", "downloadUrl", "mp3Url"));
+        }
+        return item;
+    }
+
+    private static String firstNonEmptyUrl(JSONObject jsonObject, String... keys) {
+        if (jsonObject == null || keys == null) {
+            return "";
+        }
+        for (String key : keys) {
+            String value = optNestedString(jsonObject, key);
+            if (value != null && !value.isEmpty() && !"null".equalsIgnoreCase(value)) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    private static String optNestedString(JSONObject jsonObject, String path) {
+        if (jsonObject == null || path == null || path.isEmpty()) {
+            return "";
+        }
+        String normalizedPath = path.trim();
+        if (normalizedPath.isEmpty()) {
+            return "";
+        }
+        if (!normalizedPath.contains(".")) {
+            return jsonObject.optString(normalizedPath, "");
+        }
+        String[] parts = normalizedPath.split("\\.");
+        if (parts.length == 0) {
+            return "";
+        }
+        JSONObject current = jsonObject;
+        for (int i = 0; i < parts.length - 1; i++) {
+            current = current.optJSONObject(parts[i]);
+            if (current == null) {
+                return "";
+            }
+        }
+        return current.optString(parts[parts.length - 1], "");
+    }
+
+    private static void updateUploadProgress(UploadProgressCallback callback, int progress, String message) {
+        mainHandler.post(() -> callback.onProgress(progress, message));
+    }
+
+    private static void uploadFileToNos(String uploadUrl, String token, String md5, File uploadFile,
+                                        UploadProgressCallback callback) throws Exception {
+        URL url = new URL(uploadUrl);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("x-nos-token", token);
+        conn.setRequestProperty("Content-MD5", md5);
+        conn.setRequestProperty("Content-Type", "application/octet-stream");
+        conn.setRequestProperty("Content-Length", String.valueOf(uploadFile.length()));
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(60000);
+        conn.setDoOutput(true);
+        conn.setFixedLengthStreamingMode(uploadFile.length());
+        try (InputStream inputStream = new FileInputStream(uploadFile);
+             OutputStream outputStream = conn.getOutputStream()) {
+            byte[] buffer = new byte[8192];
+            long uploaded = 0;
+            int len;
+            while ((len = inputStream.read(buffer)) != -1) {
+                outputStream.write(buffer, 0, len);
+                uploaded += len;
+                int progress = 30 + (int) ((uploaded * 60f) / Math.max(1L, uploadFile.length()));
+                updateUploadProgress(callback, Math.min(progress, 90), "正在上传文件...");
+            }
+            outputStream.flush();
+            int responseCode = conn.getResponseCode();
+            if (responseCode < 200 || responseCode >= 300) {
+                throw new IllegalStateException("文件上传失败(" + responseCode + ")");
+            }
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private static String getRaw(String urlStr) throws Exception {
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setRequestProperty("User-Agent", USER_AGENT);
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        try {
+            int responseCode = conn.getResponseCode();
+            InputStream responseStream = responseCode >= 200 && responseCode < 400
+                    ? conn.getInputStream() : conn.getErrorStream();
+            if (responseStream == null) {
+                responseStream = conn.getInputStream();
+            }
+            BufferedReader reader = new BufferedReader(new InputStreamReader(responseStream, "UTF-8"));
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            return sb.toString();
+        } finally {
+            conn.disconnect();
+        }
+    }
+
+    private static String md5(File file) throws Exception {
+        MessageDigest digest = MessageDigest.getInstance("MD5");
+        try (InputStream is = new FileInputStream(file)) {
+            byte[] buffer = new byte[8192];
+            int len;
+            while ((len = is.read(buffer)) != -1) {
+                digest.update(buffer, 0, len);
+            }
+        }
+        byte[] bytes = digest.digest();
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
+    }
+
+    private static String getFileExtension(String fileName) {
+        if (fileName == null) {
+            return "";
+        }
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex < 0 || dotIndex == fileName.length() - 1) {
+            return "";
+        }
+        return fileName.substring(dotIndex + 1).toLowerCase();
+    }
+
+    private static String stripExtension(String fileName) {
+        if (fileName == null || fileName.isEmpty()) {
+            return "";
+        }
+        int dotIndex = fileName.lastIndexOf('.');
+        if (dotIndex <= 0) {
+            return fileName;
+        }
+        return fileName.substring(0, dotIndex);
+    }
+
+    private static String buildUploadFilename(String fileName, String ext) {
+        String base = stripExtension(fileName)
+                .replaceAll("\\s+", "")
+                .replace(".", "_");
+        if (base.isEmpty()) {
+            base = "upload_" + System.currentTimeMillis();
+        }
+        return base;
     }
 
     private static Song parseRecognitionSong(JSONObject songObj) {

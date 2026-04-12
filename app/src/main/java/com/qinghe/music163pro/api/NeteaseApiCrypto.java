@@ -3,6 +3,7 @@ package com.qinghe.music163pro.api;
 import android.util.Base64;
 
 import java.math.BigInteger;
+import java.security.MessageDigest;
 import java.security.KeyFactory;
 import java.security.SecureRandom;
 import java.security.interfaces.RSAPublicKey;
@@ -22,6 +23,11 @@ public class NeteaseApiCrypto {
     private static final String IV = "0102030405060708";
     private static final String PRESET_KEY = "0CoJUm6Qyw8W8jud";
     private static final String BASE62 = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+    // Official NetEase eapi protocol constants mirrored from the public API protocol implementation.
+    // They must match the server-side protocol exactly or eapi requests will fail; they are compatibility
+    // constants rather than application-managed secrets.
+    private static final String EAPI_KEY = "e82ckenh8dichen8";
+    private static final String EAPI_MAGIC = "-36cd479b6b5-";
 
     // RSA public key (PKCS#1 format, same as in crypto.js)
     private static final String PUBLIC_KEY_PEM =
@@ -58,6 +64,22 @@ public class NeteaseApiCrypto {
     }
 
     /**
+     * eapi encryption used by a subset of official client endpoints.
+     * Returns upper-case hex string for the params field.
+     */
+    public static String eapi(String apiPath, String jsonText) {
+        try {
+            String message = "nobody" + apiPath + "use" + jsonText + "md5forencrypt";
+            String digest = md5Hex(message);
+            String payload = apiPath + EAPI_MAGIC + jsonText + EAPI_MAGIC + digest;
+            byte[] encrypted = aesEncryptECB(payload, EAPI_KEY);
+            return bytesToHex(encrypted).toUpperCase();
+        } catch (Exception e) {
+            throw new RuntimeException("EAPI encryption failed", e);
+        }
+    }
+
+    /**
      * AES-128-CBC encryption with PKCS5Padding, returns Base64
      */
     private static String aesEncryptCBC(String plaintext, String key, String iv) {
@@ -71,6 +93,35 @@ public class NeteaseApiCrypto {
         } catch (Exception e) {
             throw new RuntimeException("AES encryption failed", e);
         }
+    }
+
+    private static byte[] aesEncryptECB(String plaintext, String key) {
+        try {
+            SecretKeySpec keySpec = new SecretKeySpec(key.getBytes("UTF-8"), "AES");
+            Cipher cipher = Cipher.getInstance("AES/ECB/PKCS5Padding");
+            cipher.init(Cipher.ENCRYPT_MODE, keySpec);
+            return cipher.doFinal(plaintext.getBytes("UTF-8"));
+        } catch (Exception e) {
+            throw new RuntimeException("AES-ECB encryption failed", e);
+        }
+    }
+
+    private static String md5Hex(String text) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("MD5");
+            byte[] hashed = digest.digest(text.getBytes("UTF-8"));
+            return bytesToHex(hashed);
+        } catch (Exception e) {
+            throw new RuntimeException("MD5 failed", e);
+        }
+    }
+
+    private static String bytesToHex(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02x", b));
+        }
+        return sb.toString();
     }
 
     /**

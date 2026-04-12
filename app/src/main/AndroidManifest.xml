@@ -54,6 +54,10 @@
         <activity android:name=".activity.CommentFloorActivity" android:exported="false" />
         <activity android:name=".activity.PlaylistDetailActivity" android:exported="false" />
         <activity android:name=".activity.MyPlaylistsActivity" android:exported="false" />
+        <activity android:name=".activity.DailyRecommendActivity" android:exported="false" />
+        <activity android:name=".activity.MusicCloudActivity" android:exported="false" />
+        <activity android:name=".activity.CloudUploadProgressActivity" android:exported="false" />
+        <activity android:name=".activity.EditMoreActivity" android:exported="false" />
         <activity android:name=".activity.UpdateActivity" android:exported="false" />
         <activity android:name=".activity.MvDetailActivity" android:exported="false" />
         <activity android:name=".activity.MvPlayerActivity" android:exported="false" />
