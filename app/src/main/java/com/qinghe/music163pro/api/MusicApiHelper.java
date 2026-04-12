@@ -2384,7 +2384,12 @@ public class MusicApiHelper {
     }
 
     private static String eapiPost(String apiPath, String jsonData, String cookie) throws Exception {
-        String params = NeteaseApiCrypto.eapi(apiPath, jsonData);
+        JSONObject data = new JSONObject(jsonData);
+        JSONObject header = buildEapiHeader(cookie);
+        data.put("header", header);
+        data.put("e_r", false);
+
+        String params = NeteaseApiCrypto.eapi(apiPath, data.toString());
         String postBody = "params=" + URLEncoder.encode(params, "UTF-8");
 
         String eapiPath = apiPath.replaceFirst("^/api/", "/eapi/");
@@ -2398,7 +2403,7 @@ public class MusicApiHelper {
         conn.setRequestProperty("Referer", DOMAIN);
         conn.setRequestProperty("Origin", DOMAIN);
         conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
-        conn.setRequestProperty("Cookie", buildEapiCookie(cookie));
+        conn.setRequestProperty("Cookie", buildEapiCookie(cookie, header));
         conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
         conn.setReadTimeout(READ_TIMEOUT_MS);
         conn.setDoOutput(true);
@@ -2497,26 +2502,105 @@ public class MusicApiHelper {
         return sb.toString();
     }
 
-    private static String buildEapiCookie(String existingCookie) {
+    private static JSONObject buildEapiHeader(String existingCookie) {
+        JSONObject header = new JSONObject();
+        JSONObject cookieMap = parseCookieString(existingCookie);
+        header.put("osver", cookieMap.optString("osver", OS_VER));
+        header.put("deviceId", cookieMap.optString("deviceId", deviceId));
+        header.put("os", cookieMap.optString("os", OS_TYPE));
+        header.put("appver", cookieMap.optString("appver", APP_VER));
+        header.put("versioncode", cookieMap.optString("versioncode", VERSION_CODE));
+        header.put("mobilename", cookieMap.optString("mobilename", ""));
+        header.put("buildver", cookieMap.optString("buildver", String.valueOf(System.currentTimeMillis() / 1000L)));
+        header.put("resolution", cookieMap.optString("resolution", "320x360"));
+        header.put("__csrf", cookieMap.optString("__csrf", extractCsrfToken(existingCookie)));
+        header.put("channel", cookieMap.optString("channel", CHANNEL));
+        header.put("requestId", System.currentTimeMillis() + "_" + String.format(java.util.Locale.US, "%04d",
+                (int) (Math.random() * 1000)));
+        String musicU = cookieMap.optString("MUSIC_U", "");
+        if (!musicU.isEmpty()) {
+            header.put("MUSIC_U", musicU);
+        }
+        String musicA = cookieMap.optString("MUSIC_A", "");
+        if (!musicA.isEmpty()) {
+            header.put("MUSIC_A", musicA);
+        }
+        return header;
+    }
+
+    private static String buildEapiCookie(String existingCookie, JSONObject header) {
         StringBuilder sb = new StringBuilder();
-        if (existingCookie != null && !existingCookie.isEmpty()) {
-            sb.append(existingCookie);
-            if (!existingCookie.endsWith("; ")) {
+        LinkedHashSet<String> keys = new LinkedHashSet<>();
+        keys.add("__remember_me");
+        keys.add("ntes_kaola_ad");
+        keys.add("WEVNSM");
+        keys.add("osver");
+        keys.add("deviceId");
+        keys.add("os");
+        keys.add("appver");
+        keys.add("versioncode");
+        keys.add("mobilename");
+        keys.add("buildver");
+        keys.add("resolution");
+        keys.add("__csrf");
+        keys.add("channel");
+        keys.add("requestId");
+        keys.add("MUSIC_U");
+        keys.add("MUSIC_A");
+
+        for (String key : keys) {
+            String value;
+            switch (key) {
+                case "__remember_me":
+                    value = "true";
+                    break;
+                case "ntes_kaola_ad":
+                    value = "1";
+                    break;
+                case "WEVNSM":
+                    value = "1.0.0";
+                    break;
+                default:
+                    value = header.optString(key, "");
+                    break;
+            }
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
                 sb.append("; ");
             }
+            sb.append(URLEncoder_safe(key)).append("=").append(URLEncoder_safe(value));
         }
-        sb.append("__remember_me=true; ");
-        sb.append("ntes_kaola_ad=1; ");
-        sb.append("WEVNSM=1.0.0; ");
-        sb.append("osver=").append(URLEncoder_safe(OS_VER)).append("; ");
-        sb.append("deviceId=").append(deviceId).append("; ");
-        sb.append("os=").append(URLEncoder_safe(OS_TYPE)).append("; ");
-        sb.append("channel=").append(CHANNEL).append("; ");
-        sb.append("appver=").append(APP_VER).append("; ");
-        sb.append("versioncode=").append(VERSION_CODE).append("; ");
-        sb.append("buildver=").append(String.valueOf(System.currentTimeMillis() / 1000L)).append("; ");
-        sb.append("resolution=320x360");
         return sb.toString();
+    }
+
+    private static JSONObject parseCookieString(String cookie) {
+        JSONObject result = new JSONObject();
+        if (cookie == null || cookie.trim().isEmpty()) {
+            return result;
+        }
+        String[] parts = cookie.split(";");
+        for (String part : parts) {
+            if (part == null) {
+                continue;
+            }
+            String trimmed = part.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            int index = trimmed.indexOf('=');
+            if (index <= 0) {
+                continue;
+            }
+            String key = trimmed.substring(0, index).trim();
+            String value = trimmed.substring(index + 1).trim();
+            try {
+                result.put(key, value);
+            } catch (Exception ignored) {
+            }
+        }
+        return result;
     }
 
     private static String URLEncoder_safe(String s) {
@@ -2790,20 +2874,19 @@ public class MusicApiHelper {
         JSONObject simpleSong = itemObj.optJSONObject("simpleSong");
         boolean hasSimpleSong = simpleSong != null && simpleSong.length() > 0;
         Song parsedSong = parseSongFromJson(simpleSong != null ? simpleSong : itemObj);
-        if (parsedSong != null) {
+        if (parsedSong != null && hasSimpleSong) {
             item.setSongId(parsedSong.getId());
             item.setSongName(parsedSong.getName());
             item.setArtist(parsedSong.getArtist());
             item.setAlbum(parsedSong.getAlbum());
         }
-        if ((item.getSongName() == null || item.getSongName().isEmpty())
+        boolean isMusic = hasSimpleSong;
+        if (isMusic && (item.getSongName() == null || item.getSongName().isEmpty())
                 && item.getFileName() != null && !item.getFileName().isEmpty()) {
             item.setSongName(stripExtension(item.getFileName()));
         }
         String extension = getFileExtension(item.getFileName());
         item.setFileExtension(extension);
-        boolean isMusic = hasSimpleSong
-                || isAudioExtension(extension);
         item.setMusic(isMusic);
         if (item.getDownloadUrl() == null || item.getDownloadUrl().isEmpty()) {
             item.setDownloadUrl(firstNonEmptyUrl(simpleSong,
@@ -2848,15 +2931,6 @@ public class MusicApiHelper {
             }
         }
         return current.optString(parts[parts.length - 1], "");
-    }
-
-    private static boolean isAudioExtension(String extension) {
-        if (extension == null) {
-            return false;
-        }
-        String ext = extension.toLowerCase();
-        return "mp3".equals(ext) || "flac".equals(ext) || "wav".equals(ext)
-                || "m4a".equals(ext) || "ogg".equals(ext) || "aac".equals(ext);
     }
 
     private static void updateUploadProgress(UploadProgressCallback callback, int progress, String message) {

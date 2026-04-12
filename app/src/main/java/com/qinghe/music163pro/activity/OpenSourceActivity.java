@@ -48,6 +48,10 @@ public class OpenSourceActivity extends AppCompatActivity {
                 "Material Components for Android",
                 "开发者：Google",
                 "https://github.com/material-components/material-components-android");
+        addProject(content,
+                "AndroidX Media3 / ExoPlayer",
+                "开发者：Google",
+                "https://github.com/androidx/media");
 
         scrollView.addView(content);
         setContentView(scrollView);
