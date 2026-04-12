@@ -2504,7 +2504,7 @@ public class MusicApiHelper {
         return sb.toString();
     }
 
-    private static JSONObject buildEapiHeader(String existingCookie) {
+    private static JSONObject buildEapiHeader(String existingCookie) throws Exception {
         JSONObject header = new JSONObject();
         JSONObject cookieMap = parseCookieString(existingCookie);
         header.put("osver", cookieMap.optString("osver", OS_VER));
@@ -2517,8 +2517,7 @@ public class MusicApiHelper {
         header.put("resolution", cookieMap.optString("resolution", "320x360"));
         header.put("__csrf", cookieMap.optString("__csrf", extractCsrfToken(existingCookie)));
         header.put("channel", cookieMap.optString("channel", CHANNEL));
-        header.put("requestId", System.currentTimeMillis() + "_" + String.format(java.util.Locale.US, "%04d",
-                (int) (Math.random() * 1000)));
+        header.put("requestId", buildRequestId());
         String musicU = cookieMap.optString("MUSIC_U", "");
         if (!musicU.isEmpty()) {
             header.put("MUSIC_U", musicU);
@@ -2603,6 +2602,10 @@ public class MusicApiHelper {
             }
         }
         return result;
+    }
+
+    private static String buildRequestId() {
+        return System.currentTimeMillis() + "_" + UUID.randomUUID().toString().replace("-", "").substring(0, 4);
     }
 
     private static String URLEncoder_safe(String s) {
