@@ -42,6 +42,7 @@ public class MusicApiHelper {
 
     private static final String WEAPI_BASE = "https://music.163.com/weapi";
     private static final String DOMAIN = "https://music.163.com";
+    private static final String API_DOMAIN = "https://interface.music.163.com";
     private static final String SONG_COMMENT_THREAD_PREFIX = "R_SO_4_";
 
     private static final String USER_AGENT =
@@ -1751,8 +1752,12 @@ public class MusicApiHelper {
                 checkData.put("md5", md5);
                 checkData.put("songId", "0");
                 checkData.put("version", 1);
-                String checkResponse = weapiPost("/api/cloud/upload/check", checkData.toString(), cookie);
+                String checkResponse = eapiPost("/api/cloud/upload/check", checkData.toString(), cookie);
                 JSONObject checkJson = new JSONObject(checkResponse);
+                if (checkJson.optInt("code", -1) != 200) {
+                    mainHandler.post(() -> callback.onError(checkJson.optString("message", "上传校验失败")));
+                    return;
+                }
 
                 updateUploadProgress(callback, 20, "正在申请上传凭证...");
                 JSONObject tokenData = new JSONObject();
@@ -1761,7 +1766,7 @@ public class MusicApiHelper {
                 tokenData.put("filename", filenameBase);
                 tokenData.put("local", false);
                 tokenData.put("nos_product", 3);
-                tokenData.put("type", musicFile ? "audio" : "other");
+                tokenData.put("type", "audio");
                 tokenData.put("md5", md5);
                 String tokenResponse = weapiPost("/api/nos/token/alloc", tokenData.toString(), cookie);
                 JSONObject tokenJson = new JSONObject(tokenResponse);
@@ -1795,13 +1800,17 @@ public class MusicApiHelper {
                 infoData.put("artist", "未知艺术家");
                 infoData.put("bitrate", "999000");
                 infoData.put("resourceId", tokenResult.optString("resourceId", ""));
-                String infoResponse = weapiPost("/api/upload/cloud/info/v2", infoData.toString(), cookie);
+                String infoResponse = eapiPost("/api/upload/cloud/info/v2", infoData.toString(), cookie);
                 JSONObject infoJson = new JSONObject(infoResponse);
+                if (infoJson.optInt("code", -1) != 200) {
+                    mainHandler.post(() -> callback.onError(infoJson.optString("message", "云盘信息提交失败")));
+                    return;
+                }
                 long songId = infoJson.optLong("songId", 0);
 
                 JSONObject pubData = new JSONObject();
                 pubData.put("songid", songId);
-                String pubResponse = weapiPost("/api/cloud/pub/v2", pubData.toString(), cookie);
+                String pubResponse = eapiPost("/api/cloud/pub/v2", pubData.toString(), cookie);
                 JSONObject pubJson = new JSONObject(pubResponse);
                 int code = pubJson.optInt("code", -1);
                 if (code == 200) {
@@ -2374,6 +2383,54 @@ public class MusicApiHelper {
         }
     }
 
+    private static String eapiPost(String apiPath, String jsonData, String cookie) throws Exception {
+        String params = NeteaseApiCrypto.eapi(apiPath, jsonData);
+        String postBody = "params=" + URLEncoder.encode(params, "UTF-8");
+
+        String eapiPath = apiPath.replaceFirst("^/api/", "/eapi/");
+        String urlStr = API_DOMAIN + eapiPath;
+        MusicLog.i(TAG, "[REQ] POST(eapi) " + urlStr + "\n  请求体(原文): " + jsonData);
+
+        URL url = new URL(urlStr);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("POST");
+        conn.setRequestProperty("User-Agent", "NeteaseMusic 9.0.90/5038 (iPhone; iOS 16.2; zh_CN)");
+        conn.setRequestProperty("Referer", DOMAIN);
+        conn.setRequestProperty("Origin", DOMAIN);
+        conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+        conn.setRequestProperty("Cookie", buildEapiCookie(cookie));
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setDoOutput(true);
+
+        try {
+            OutputStream os = conn.getOutputStream();
+            os.write(postBody.getBytes("UTF-8"));
+            os.close();
+
+            int responseCode = conn.getResponseCode();
+            BufferedReader reader;
+            if (responseCode >= 200 && responseCode < 400) {
+                reader = new BufferedReader(new InputStreamReader(conn.getInputStream(), "UTF-8"));
+            } else {
+                InputStream errStream = conn.getErrorStream();
+                reader = new BufferedReader(new InputStreamReader(
+                        errStream != null ? errStream : conn.getInputStream(), "UTF-8"));
+            }
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            reader.close();
+            String responseBody = sb.toString();
+            MusicLog.api(TAG, "POST(eapi)", urlStr, responseCode, responseBody);
+            return responseBody;
+        } finally {
+            conn.disconnect();
+        }
+    }
+
     /**
      * Build a cookie string with Android mobile device identity.
      * Used for SMS login to avoid "环境不安全" error.
@@ -2437,6 +2494,28 @@ public class MusicApiHelper {
         sb.append("os=").append(URLEncoder_safe(OS_TYPE)).append("; ");
         sb.append("channel=").append(CHANNEL).append("; ");
         sb.append("appver=").append(APP_VER);
+        return sb.toString();
+    }
+
+    private static String buildEapiCookie(String existingCookie) {
+        StringBuilder sb = new StringBuilder();
+        if (existingCookie != null && !existingCookie.isEmpty()) {
+            sb.append(existingCookie);
+            if (!existingCookie.endsWith("; ")) {
+                sb.append("; ");
+            }
+        }
+        sb.append("__remember_me=true; ");
+        sb.append("ntes_kaola_ad=1; ");
+        sb.append("WEVNSM=1.0.0; ");
+        sb.append("osver=").append(URLEncoder_safe(OS_VER)).append("; ");
+        sb.append("deviceId=").append(deviceId).append("; ");
+        sb.append("os=").append(URLEncoder_safe(OS_TYPE)).append("; ");
+        sb.append("channel=").append(CHANNEL).append("; ");
+        sb.append("appver=").append(APP_VER).append("; ");
+        sb.append("versioncode=").append(VERSION_CODE).append("; ");
+        sb.append("buildver=").append(String.valueOf(System.currentTimeMillis() / 1000L)).append("; ");
+        sb.append("resolution=320x360");
         return sb.toString();
     }
 
@@ -2709,6 +2788,7 @@ public class MusicApiHelper {
                 "url", "downloadUrl", "simpleSong.url"));
 
         JSONObject simpleSong = itemObj.optJSONObject("simpleSong");
+        boolean hasSimpleSong = simpleSong != null && simpleSong.length() > 0;
         Song parsedSong = parseSongFromJson(simpleSong != null ? simpleSong : itemObj);
         if (parsedSong != null) {
             item.setSongId(parsedSong.getId());
@@ -2722,8 +2802,7 @@ public class MusicApiHelper {
         }
         String extension = getFileExtension(item.getFileName());
         item.setFileExtension(extension);
-        boolean isMusic = simpleSong != null
-                || itemObj.has("simpleSong")
+        boolean isMusic = hasSimpleSong
                 || isAudioExtension(extension);
         item.setMusic(isMusic);
         if (item.getDownloadUrl() == null || item.getDownloadUrl().isEmpty()) {
