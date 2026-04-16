@@ -18,15 +18,14 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.Collections;
+import java.util.Locale;
 import java.util.Set;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 public class OpenShareLinkActivity extends BaseWatchActivity {
 
     private static final String TAG = "OpenShareLinkActivity";
     private static final String EXTRA_SHARE_TYPE = "_xtc_api_share_type";
-    private static final Pattern MUSIC_SHARE_PATTERN = Pattern.compile("^MUSIC_(\\d+)$");
+    private static final int MAX_SHARE_TYPE_LENGTH = 64;
 
     private TextView tvStatus;
     private View errorContainer;
@@ -61,15 +60,26 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
             return;
         }
 
-        Matcher matcher = MUSIC_SHARE_PATTERN.matcher(shareType.trim());
-        if (!matcher.matches()) {
+        shareType = shareType.trim();
+        if (shareType.length() > MAX_SHARE_TYPE_LENGTH) {
+            showError("参数长度异常: " + shareType.length(), intent);
+            return;
+        }
+
+        if (!shareType.startsWith("MUSIC_")) {
+            showError("参数格式错误: " + shareType, intent);
+            return;
+        }
+
+        String songIdText = shareType.substring("MUSIC_".length());
+        if (TextUtils.isEmpty(songIdText) || !TextUtils.isDigitsOnly(songIdText)) {
             showError("参数格式错误: " + shareType, intent);
             return;
         }
 
         long songId;
         try {
-            songId = Long.parseLong(matcher.group(1));
+            songId = Long.parseLong(songIdText);
         } catch (NumberFormatException e) {
             showError("无法解析歌曲ID: " + shareType, intent);
             return;
@@ -137,8 +147,8 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         if (isActivityUnavailable()) {
             return;
         }
-        String intentDump = dumpIntent(intent);
-        Log.e(TAG, message + "\n" + intentDump);
+        String intentDump = dumpIntent(intent, false);
+        Log.e(TAG, message + "\n" + dumpIntent(intent, true));
         tvStatus.setText("分享链接打开失败");
         errorContainer.setVisibility(View.VISIBLE);
         tvErrorMessage.setText(message);
@@ -205,7 +215,7 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         return new Song(id, name, artistBuilder.toString(), album);
     }
 
-    private String dumpIntent(Intent intent) {
+    private String dumpIntent(Intent intent, boolean redactSensitiveValues) {
         if (intent == null) {
             return "Intent = null";
         }
@@ -229,9 +239,24 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         builder.append("extras = {\n");
         for (String key : extras.keySet()) {
             Object value = extras.get(key);
+            if (redactSensitiveValues && isSensitiveKey(key)) {
+                value = "<redacted>";
+            }
             builder.append("  ").append(key).append(" = ").append(String.valueOf(value)).append('\n');
         }
         builder.append('}');
         return builder.toString();
+    }
+
+    private boolean isSensitiveKey(String key) {
+        if (TextUtils.isEmpty(key)) {
+            return false;
+        }
+        String normalizedKey = key.toLowerCase(Locale.ROOT);
+        return normalizedKey.contains("cookie")
+                || normalizedKey.contains("token")
+                || normalizedKey.contains("auth")
+                || normalizedKey.contains("session")
+                || normalizedKey.contains("password");
     }
 }
