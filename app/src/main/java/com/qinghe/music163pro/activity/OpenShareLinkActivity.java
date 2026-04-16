@@ -18,7 +18,6 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.Collections;
-import java.util.Locale;
 import java.util.Set;
 
 public class OpenShareLinkActivity extends BaseWatchActivity {
@@ -147,8 +146,9 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         if (isActivityUnavailable()) {
             return;
         }
-        String intentDump = dumpIntent(intent, false);
-        Log.e(TAG, message + "\n" + dumpIntent(intent, true));
+        String intentDump = dumpIntent(intent);
+        Log.e(TAG, message + " action=" + (intent != null ? intent.getAction() : null)
+                + " data=" + (intent != null ? intent.getDataString() : null));
         tvStatus.setText("分享链接打开失败");
         errorContainer.setVisibility(View.VISIBLE);
         tvErrorMessage.setText(message);
@@ -215,7 +215,7 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         return new Song(id, name, artistBuilder.toString(), album);
     }
 
-    private String dumpIntent(Intent intent, boolean redactSensitiveValues) {
+    private String dumpIntent(Intent intent) {
         if (intent == null) {
             return "Intent = null";
         }
@@ -239,24 +239,9 @@ public class OpenShareLinkActivity extends BaseWatchActivity {
         builder.append("extras = {\n");
         for (String key : extras.keySet()) {
             Object value = extras.get(key);
-            if (redactSensitiveValues && isSensitiveKey(key)) {
-                value = "<redacted>";
-            }
             builder.append("  ").append(key).append(" = ").append(String.valueOf(value)).append('\n');
         }
         builder.append('}');
         return builder.toString();
-    }
-
-    private boolean isSensitiveKey(String key) {
-        if (TextUtils.isEmpty(key)) {
-            return false;
-        }
-        String normalizedKey = key.toLowerCase(Locale.ROOT);
-        return normalizedKey.contains("cookie")
-                || normalizedKey.contains("token")
-                || normalizedKey.contains("auth")
-                || normalizedKey.contains("session")
-                || normalizedKey.contains("password");
     }
 }
