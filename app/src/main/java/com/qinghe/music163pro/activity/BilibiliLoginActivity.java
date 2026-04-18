@@ -2,7 +2,6 @@ package com.qinghe.music163pro.activity;
 
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Handler;
 import android.view.Gravity;
@@ -59,7 +58,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         container.addView(qrCard);
 
         ivQrCode = new ImageView(this);
-        int qrSize = px(132);
+        int qrSize = px(140);
         LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(qrSize, qrSize);
         qrParams.gravity = Gravity.CENTER_HORIZONTAL;
         ivQrCode.setLayoutParams(qrParams);
@@ -78,7 +77,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
 
         btnRefresh = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         btnRefresh.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
         btnRefresh.setText("刷新二维码");
         btnRefresh.setTextSize(12);
         btnRefresh.setAllCaps(false);
@@ -220,11 +219,11 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -242,7 +241,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         bar.addView(title);
 
         ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         bar.addView(placeholder);
         return bar;
     }

@@ -70,6 +70,9 @@
         <activity android:name=".activity.BilibiliLoginActivity" android:exported="false" />
         <activity android:name=".activity.BilibiliFavoritesActivity" android:exported="false" />
         <activity android:name=".activity.BilibiliPlaylistActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliSearchActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliCloudFavoritesActivity" android:exported="false" />
+        <activity android:name=".activity.BilibiliCloudFavoriteVideosActivity" android:exported="false" />
 
         <provider
             android:name="androidx.core.content.FileProvider"

@@ -13,6 +13,7 @@ import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -71,6 +72,21 @@ public class BilibiliApiHelper {
         void onError(String message);
     }
 
+    public interface SearchVideosCallback {
+        void onResult(List<BilibiliSearchVideo> videos);
+        void onError(String message);
+    }
+
+    public interface FavoriteFoldersCallback {
+        void onResult(List<BilibiliFavoriteFolder> folders);
+        void onError(String message);
+    }
+
+    public interface FavoriteFolderVideosCallback {
+        void onResult(String folderTitle, List<BilibiliSearchVideo> videos);
+        void onError(String message);
+    }
+
     // ======================== Data Classes ========================
 
     public static class BilibiliPage {
@@ -103,6 +119,37 @@ public class BilibiliApiHelper {
             this.lan = lan;
             this.lanDoc = lanDoc;
             this.subtitleUrl = subtitleUrl;
+        }
+    }
+
+    public static class BilibiliSearchVideo {
+        public long aid;
+        public String bvid;
+        public String title;
+        public String ownerName;
+        public String description;
+        public int duration;
+
+        public BilibiliSearchVideo(long aid, String bvid, String title,
+                                   String ownerName, String description, int duration) {
+            this.aid = aid;
+            this.bvid = bvid;
+            this.title = title;
+            this.ownerName = ownerName;
+            this.description = description;
+            this.duration = duration;
+        }
+    }
+
+    public static class BilibiliFavoriteFolder {
+        public long mediaId;
+        public String title;
+        public int mediaCount;
+
+        public BilibiliFavoriteFolder(long mediaId, String title, int mediaCount) {
+            this.mediaId = mediaId;
+            this.title = title;
+            this.mediaCount = mediaCount;
         }
     }
 
@@ -404,6 +451,128 @@ public class BilibiliApiHelper {
         });
     }
 
+    public static void searchVideos(String keyword, String cookie, SearchVideosCallback callback) {
+        executor.execute(() -> {
+            try {
+                String normalizedKeyword = keyword != null ? keyword.trim() : "";
+                if (normalizedKeyword.isEmpty()) {
+                    postError(callback, "搜索关键词不能为空");
+                    return;
+                }
+                String requestCookie = ensureSearchCookie(cookie);
+                String url = "https://api.bilibili.com/x/web-interface/search/type?search_type=video"
+                        + "&keyword=" + URLEncoder.encode(normalizedKeyword, "UTF-8");
+                String response = httpGet(url, requestCookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 0) {
+                    postError(callback, json.optString("message", "搜索失败"));
+                    return;
+                }
+
+                JSONObject data = json.optJSONObject("data");
+                JSONArray resultArray = data != null ? data.optJSONArray("result") : null;
+                List<BilibiliSearchVideo> videos = new ArrayList<>();
+                if (resultArray != null) {
+                    for (int i = 0; i < resultArray.length(); i++) {
+                        JSONObject item = resultArray.getJSONObject(i);
+                        videos.add(new BilibiliSearchVideo(
+                                item.optLong("aid", 0),
+                                item.optString("bvid", ""),
+                                stripHtml(item.optString("title", "")),
+                                stripHtml(item.optString("author", "")),
+                                stripHtml(item.optString("description", "")),
+                                parseDurationTextToSeconds(item.optString("duration", "0:00"))
+                        ));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(videos));
+            } catch (Exception e) {
+                Log.e(TAG, "searchVideos error", e);
+                postError(callback, e.getMessage());
+            }
+        });
+    }
+
+    public static void getFavoriteFolders(String cookie, FavoriteFoldersCallback callback) {
+        executor.execute(() -> {
+            try {
+                long mid = extractDedeUserId(cookie);
+                if (mid <= 0) {
+                    postError(callback, "未获取到B站账号信息");
+                    return;
+                }
+                String url = "https://api.bilibili.com/x/v3/fav/folder/created/list-all?type=2&up_mid=" + mid;
+                String response = httpGet(url, cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 0) {
+                    postError(callback, json.optString("message", "加载收藏夹失败"));
+                    return;
+                }
+
+                JSONObject data = json.optJSONObject("data");
+                JSONArray listArray = data != null ? data.optJSONArray("list") : null;
+                List<BilibiliFavoriteFolder> folders = new ArrayList<>();
+                if (listArray != null) {
+                    for (int i = 0; i < listArray.length(); i++) {
+                        JSONObject item = listArray.getJSONObject(i);
+                        folders.add(new BilibiliFavoriteFolder(
+                                item.optLong("id", 0),
+                                item.optString("title", ""),
+                                item.optInt("media_count", 0)
+                        ));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(folders));
+            } catch (Exception e) {
+                Log.e(TAG, "getFavoriteFolders error", e);
+                postError(callback, e.getMessage());
+            }
+        });
+    }
+
+    public static void getFavoriteFolderVideos(long mediaId, String cookie,
+                                               FavoriteFolderVideosCallback callback) {
+        executor.execute(() -> {
+            try {
+                String url = "https://api.bilibili.com/x/v3/fav/resource/list?media_id=" + mediaId
+                        + "&pn=1&ps=20&platform=web";
+                String response = httpGet(url, cookie);
+                JSONObject json = new JSONObject(response);
+                int code = json.optInt("code", -1);
+                if (code != 0) {
+                    postError(callback, json.optString("message", "加载收藏夹视频失败"));
+                    return;
+                }
+
+                JSONObject data = json.optJSONObject("data");
+                JSONObject info = data != null ? data.optJSONObject("info") : null;
+                String folderTitle = info != null ? info.optString("title", "") : "";
+                JSONArray medias = data != null ? data.optJSONArray("medias") : null;
+                List<BilibiliSearchVideo> videos = new ArrayList<>();
+                if (medias != null) {
+                    for (int i = 0; i < medias.length(); i++) {
+                        JSONObject item = medias.getJSONObject(i);
+                        JSONObject upper = item.optJSONObject("upper");
+                        videos.add(new BilibiliSearchVideo(
+                                item.optLong("id", 0),
+                                item.optString("bvid", ""),
+                                item.optString("title", ""),
+                                upper != null ? upper.optString("name", "") : item.optString("upper", ""),
+                                item.optString("intro", ""),
+                                item.optInt("duration", 0)
+                        ));
+                    }
+                }
+                mainHandler.post(() -> callback.onResult(folderTitle, videos));
+            } catch (Exception e) {
+                Log.e(TAG, "getFavoriteFolderVideos error", e);
+                postError(callback, e.getMessage());
+            }
+        });
+    }
+
     // ======================== Helper Methods ========================
 
     private static String httpGet(String urlStr, String cookie) throws Exception {
@@ -505,6 +674,96 @@ public class BilibiliApiHelper {
         return "";
     }
 
+    private static long extractDedeUserId(String cookie) {
+        if (cookie == null || cookie.isEmpty()) {
+            return 0;
+        }
+        try {
+            String[] parts = cookie.split(";");
+            for (String part : parts) {
+                String trimmed = part.trim();
+                if (trimmed.startsWith("DedeUserID=")) {
+                    return Long.parseLong(trimmed.substring("DedeUserID=".length()));
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "extractDedeUserId error", e);
+        }
+        return 0;
+    }
+
+    private static String ensureSearchCookie(String cookie) throws Exception {
+        if (cookie != null && !cookie.isEmpty() && cookie.contains("buvid3")) {
+            return cookie;
+        }
+        HttpURLConnection conn = null;
+        try {
+            conn = createConnection("https://www.bilibili.com", cookie);
+            conn.setRequestMethod("GET");
+            conn.connect();
+            Map<String, List<String>> headers = conn.getHeaderFields();
+            List<String> setCookies = headers.get("Set-Cookie");
+            if (setCookies == null || setCookies.isEmpty()) {
+                return cookie;
+            }
+            StringBuilder builder = new StringBuilder(cookie != null ? cookie.trim() : "");
+            for (String rawCookie : setCookies) {
+                String kv = rawCookie.split(";", 2)[0].trim();
+                if (kv.isEmpty()) {
+                    continue;
+                }
+                if (builder.length() > 0 && !containsCookie(builder.toString(), kv)) {
+                    builder.append("; ");
+                }
+                if (!containsCookie(builder.toString(), kv)) {
+                    builder.append(kv);
+                }
+            }
+            return builder.toString();
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    private static boolean containsCookie(String cookie, String keyValue) {
+        if (cookie == null || cookie.isEmpty() || keyValue == null || keyValue.isEmpty()) {
+            return false;
+        }
+        String key = keyValue.split("=", 2)[0];
+        String[] parts = cookie.split(";");
+        for (String part : parts) {
+            if (part.trim().startsWith(key + "=")) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private static String stripHtml(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("<[^>]+>", "").replace("&amp;", "&").replace("&quot;", "\"");
+    }
+
+    private static int parseDurationTextToSeconds(String durationText) {
+        if (durationText == null || durationText.isEmpty()) {
+            return 0;
+        }
+        try {
+            String[] parts = durationText.split(":");
+            int total = 0;
+            for (String part : parts) {
+                total = total * 60 + Integer.parseInt(part.trim());
+            }
+            return total;
+        } catch (Exception e) {
+            return 0;
+        }
+    }
+
     // Overloaded postError for each callback type
     private static void postError(VideoInfoCallback cb, String msg) {
         mainHandler.post(() -> cb.onError(msg != null ? msg : "Unknown error"));
@@ -527,6 +786,18 @@ public class BilibiliApiHelper {
     }
 
     private static void postError(SubtitleListCallback cb, String msg) {
+        mainHandler.post(() -> cb.onError(msg != null ? msg : "Unknown error"));
+    }
+
+    private static void postError(SearchVideosCallback cb, String msg) {
+        mainHandler.post(() -> cb.onError(msg != null ? msg : "Unknown error"));
+    }
+
+    private static void postError(FavoriteFoldersCallback cb, String msg) {
+        mainHandler.post(() -> cb.onError(msg != null ? msg : "Unknown error"));
+    }
+
+    private static void postError(FavoriteFolderVideosCallback cb, String msg) {
         mainHandler.post(() -> cb.onError(msg != null ? msg : "Unknown error"));
     }
 }

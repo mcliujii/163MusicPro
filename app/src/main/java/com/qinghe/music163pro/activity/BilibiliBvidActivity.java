@@ -22,7 +22,6 @@ import com.qinghe.music163pro.manager.BilibiliFavoritesManager;
 import com.qinghe.music163pro.model.BilibiliFavorite;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
-import com.qinghe.music163pro.util.WatchUiUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -76,7 +75,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         etBvid = new EditText(this);
         etBvid.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(44)));
         etBvid.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
         etBvid.setHint("BV1xxxxxxxxx");
         etBvid.setTextColor(getResources().getColor(R.color.text_primary));
@@ -89,7 +88,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         btnFetch = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(42));
         btnParams.topMargin = px(8);
         btnFetch.setLayoutParams(btnParams);
         btnFetch.setText("解析视频");
@@ -109,7 +108,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         btnFavorite = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
         ((LinearLayout.LayoutParams) btnFavorite.getLayoutParams()).topMargin = px(4);
         btnFavorite.setText("收藏BV号");
         btnFavorite.setTextSize(12);
@@ -171,7 +170,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                 MaterialButton btnPlayAll = new MaterialButton(
                         BilibiliBvidActivity.this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
                 LinearLayout.LayoutParams playAllParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, px(34));
+                        ViewGroup.LayoutParams.MATCH_PARENT, px(42));
                 playAllParams.topMargin = px(4);
                 btnPlayAll.setLayoutParams(playAllParams);
                 btnPlayAll.setText("全部播放 (" + pages.size() + "集)");
@@ -194,7 +193,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                     row.setLayoutParams(rowParams);
                     row.setOrientation(LinearLayout.HORIZONTAL);
                     row.setGravity(Gravity.CENTER_VERTICAL);
-                    row.setPadding(px(10), px(8), px(10), px(8));
+                    row.setPadding(px(12), px(10), px(12), px(10));
                     row.setClickable(true);
                     row.setFocusable(true);
                     row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
@@ -218,7 +217,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                     TextView tvPart = new TextView(BilibiliBvidActivity.this);
                     tvPart.setText(page.part.isEmpty() ? page.videoTitle : page.part);
                     tvPart.setTextColor(getResources().getColor(R.color.text_primary));
-                    tvPart.setTextSize(12);
+                    tvPart.setTextSize(13);
                     tvPart.setSingleLine(true);
                     tvPart.setEllipsize(TextUtils.TruncateAt.END);
                     infoCol.addView(tvPart);
@@ -226,7 +225,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                     TextView tvDur = new TextView(BilibiliBvidActivity.this);
                     tvDur.setText(formatDuration(page.duration) + " · " + currentBvid);
                     tvDur.setTextColor(getResources().getColor(R.color.text_secondary));
-                    tvDur.setTextSize(10);
+                    tvDur.setTextSize(11);
                     infoCol.addView(tvDur);
 
                     row.addView(infoCol);
@@ -300,11 +299,11 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -322,7 +321,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         bar.addView(title);
 
         ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         bar.addView(placeholder);
         return bar;
     }

@@ -21,6 +21,8 @@ import com.qinghe.music163pro.util.WatchUiUtils;
  */
 public class BilibiliActivity extends BaseWatchActivity {
 
+    private LinearLayout cloudFavoritesItem;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -35,6 +37,9 @@ public class BilibiliActivity extends BaseWatchActivity {
 
         container.addView(createTitleBar());
 
+        container.addView(createMenuItem(R.drawable.ic_search, "搜索视频",
+                () -> startActivity(new Intent(this, BilibiliSearchActivity.class))));
+
         // Menu item: 从BV号打开
         container.addView(createMenuItem(R.drawable.ic_video_library, "从BV号打开",
                 () -> startActivity(new Intent(this, BilibiliBvidActivity.class))));
@@ -45,6 +50,10 @@ public class BilibiliActivity extends BaseWatchActivity {
         // Menu item: 登录
         container.addView(createMenuItem(R.drawable.ic_qr_code, "登录B站",
                 () -> startActivity(new Intent(this, BilibiliLoginActivity.class))));
+
+        cloudFavoritesItem = createMenuItem(R.drawable.ic_cloud, "云端收藏",
+                () -> startActivity(new Intent(this, BilibiliCloudFavoritesActivity.class)));
+        container.addView(cloudFavoritesItem);
 
         // Show login status
         LinearLayout statusRow = new LinearLayout(this);
@@ -64,6 +73,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         tvLoginStatus.setTextColor(getResources().getColor(R.color.text_secondary));
         tvLoginStatus.setTextSize(11);
         updateLoginStatus(tvLoginStatus);
+        updateCloudFavoritesVisibility();
         statusRow.addView(tvLoginStatus);
         container.addView(statusRow);
 
@@ -78,6 +88,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         if (tvStatus != null) {
             updateLoginStatus(tvStatus);
         }
+        updateCloudFavoritesVisibility();
     }
 
     private void updateLoginStatus(TextView tv) {
@@ -90,14 +101,24 @@ public class BilibiliActivity extends BaseWatchActivity {
         }
     }
 
+    private void updateCloudFavoritesVisibility() {
+        if (cloudFavoritesItem == null) {
+            return;
+        }
+        SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+        String cookie = prefs.getString("bilibili_cookie", "");
+        cloudFavoritesItem.setVisibility(
+                !TextUtils.isEmpty(cookie) && cookie.contains("SESSDATA") ? android.view.View.VISIBLE : android.view.View.GONE);
+    }
+
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -123,12 +144,12 @@ public class BilibiliActivity extends BaseWatchActivity {
     private LinearLayout createMenuItem(int iconRes, String label, Runnable onClick) {
         LinearLayout row = new LinearLayout(this);
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(44));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(52));
         params.topMargin = px(6);
         row.setLayoutParams(params);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(px(12), 0, px(12), 0);
+        row.setPadding(px(14), 0, px(14), 0);
         row.setClickable(true);
         row.setFocusable(true);
         row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
@@ -136,7 +157,7 @@ public class BilibiliActivity extends BaseWatchActivity {
 
         ImageView icon = new ImageView(this);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                px(18), px(18));
+                px(22), px(22));
         icon.setLayoutParams(iconParams);
         icon.setImageResource(iconRes);
         icon.setAlpha(0.7f);
@@ -149,7 +170,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         tv.setLayoutParams(tvParams);
         tv.setText(label);
         tv.setTextColor(getResources().getColor(R.color.text_primary));
-        tv.setTextSize(13);
+        tv.setTextSize(14);
         row.addView(tv);
 
         return row;

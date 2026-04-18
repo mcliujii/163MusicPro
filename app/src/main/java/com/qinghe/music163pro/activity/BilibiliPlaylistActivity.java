@@ -67,7 +67,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
 
         btnPlayAll = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
         btnPlayAll.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
         btnPlayAll.setText("全部播放");
         btnPlayAll.setAllCaps(false);
         btnPlayAll.setTextSize(12);
@@ -97,11 +97,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
     private LinearLayout createTitleBar() {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
         back.setOnClickListener(v -> finish());
@@ -121,7 +121,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         bar.addView(title);
 
         btnFavorite = new ImageView(this);
-        btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         btnFavorite.setOnClickListener(v -> toggleFavorite());
         bar.addView(btnFavorite);
         return bar;
@@ -178,7 +178,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             params.topMargin = px(6);
             item.setLayoutParams(params);
             item.setOrientation(LinearLayout.VERTICAL);
-            item.setPadding(px(10), px(8), px(10), px(8));
+            item.setPadding(px(12), px(10), px(12), px(10));
             item.setBackgroundColor(getResources().getColor(
                     i == currentIndex ? R.color.colorPrimaryDark : R.color.surface_elevated));
             item.setClickable(true);
@@ -189,7 +189,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             String prefix = i == currentIndex ? "▶ " : (page.page + ". ");
             title.setText(prefix + (TextUtils.isEmpty(page.part) ? page.videoTitle : page.part));
             title.setTextColor(getResources().getColor(R.color.text_primary));
-            title.setTextSize(13);
+            title.setTextSize(14);
             title.setSingleLine(true);
             title.setEllipsize(TextUtils.TruncateAt.END);
             item.addView(title);
@@ -197,7 +197,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             TextView sub = new TextView(this);
             sub.setText(formatDuration(page.duration) + " · " + bvid);
             sub.setTextColor(getResources().getColor(R.color.text_secondary));
-            sub.setTextSize(10);
+            sub.setTextSize(11);
             sub.setSingleLine(true);
             sub.setEllipsize(TextUtils.TruncateAt.END);
             sub.setPadding(0, px(2), 0, 0);

@@ -65,11 +65,11 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
     private LinearLayout createTitleBar(String title) {
         LinearLayout bar = new LinearLayout(this);
         bar.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         bar.setGravity(Gravity.CENTER_VERTICAL);
 
         ImageView back = new ImageView(this);
-        LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(px(20), px(20));
+        LinearLayout.LayoutParams backParams = new LinearLayout.LayoutParams(px(22), px(22));
         back.setLayoutParams(backParams);
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
@@ -88,7 +88,7 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
         bar.addView(tvTitle);
 
         ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         bar.addView(placeholder);
 
         return bar;
@@ -108,7 +108,7 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
         item.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         item.setOrientation(LinearLayout.VERTICAL);
-        item.setPadding(px(10), px(8), px(10), px(8));
+        item.setPadding(px(12), px(10), px(12), px(10));
         ((LinearLayout.LayoutParams) item.getLayoutParams()).topMargin = px(6);
         item.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
         item.setClickable(true);
@@ -124,7 +124,7 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
         TextView title = new TextView(this);
         title.setText(TextUtils.isEmpty(favorite.getTitle()) ? favorite.getBvid() : favorite.getTitle());
         title.setTextColor(getResources().getColor(R.color.text_primary));
-        title.setTextSize(13);
+        title.setTextSize(14);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         item.addView(title);
@@ -136,7 +136,7 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
         }
         bvid.setText(extra);
         bvid.setTextColor(getResources().getColor(R.color.text_secondary));
-        bvid.setTextSize(11);
+        bvid.setTextSize(12);
         bvid.setSingleLine(true);
         bvid.setEllipsize(TextUtils.TruncateAt.END);
         bvid.setPadding(0, px(2), 0, 0);
