@@ -266,8 +266,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         List<Song> songs = new ArrayList<>();
         for (BilibiliApiHelper.BilibiliPage page : pages) {
             Song song = new Song();
-            // Use negative cid as id to avoid collision with NetEase song IDs.
-            song.setId(-page.cid);
+            song.setId(buildBilibiliSongId(page.bvid, page.cid));
             song.setName(TextUtils.isEmpty(page.part) ? page.videoTitle : page.part);
             song.setArtist(page.ownerName);
             song.setAlbum(page.videoTitle);
@@ -315,5 +314,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         int min = seconds / 60;
         int sec = seconds % 60;
         return String.format("%d:%02d", min, sec);
+    }
+
+    private long buildBilibiliSongId(String bvid, long cid) {
+        long mixed = ((((long) (bvid != null ? bvid.hashCode() : 0)) & 0xFFFFFFFFL) << 32)
+                ^ (cid & 0xFFFFFFFFL);
+        return -Math.abs(mixed == 0 ? cid + 1 : mixed);
     }
 }
