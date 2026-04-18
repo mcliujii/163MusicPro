@@ -13,10 +13,10 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.material.button.MaterialButton;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.util.QrCodeGenerator;
-import com.qinghe.music163pro.util.WatchUiUtils;
 
 /**
  * Bilibili QR code login activity.
@@ -26,7 +26,7 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
 
     private ImageView ivQrCode;
     private TextView tvStatus;
-    private TextView btnRefresh;
+    private MaterialButton btnRefresh;
 
     private String qrcodeKey = "";
     private final Handler pollHandler = new Handler();
@@ -45,56 +45,45 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
         container.setGravity(Gravity.CENTER_HORIZONTAL);
-        container.setPadding(WatchUiUtils.px(this, 12), WatchUiUtils.px(this, 8),
-                WatchUiUtils.px(this, 12), WatchUiUtils.px(this, 8));
+        container.setPadding(px(10), px(8), px(10), px(10));
 
-        // Title
-        TextView tvTitle = new TextView(this);
-        tvTitle.setLayoutParams(new LinearLayout.LayoutParams(
+        container.addView(createTitleBar());
+
+        LinearLayout qrCard = new LinearLayout(this);
+        qrCard.setOrientation(LinearLayout.VERTICAL);
+        qrCard.setGravity(Gravity.CENTER_HORIZONTAL);
+        qrCard.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        qrCard.setPadding(px(10), px(10), px(10), px(10));
+        qrCard.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        tvTitle.setText("B站扫码登录");
-        tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, WatchUiUtils.px(this, 8));
-        container.addView(tvTitle);
+        container.addView(qrCard);
 
-        // QR code image
         ivQrCode = new ImageView(this);
-        int qrSize = WatchUiUtils.px(this, 160);
+        int qrSize = px(132);
         LinearLayout.LayoutParams qrParams = new LinearLayout.LayoutParams(qrSize, qrSize);
         qrParams.gravity = Gravity.CENTER_HORIZONTAL;
         ivQrCode.setLayoutParams(qrParams);
         ivQrCode.setBackgroundColor(Color.WHITE);
-        ivQrCode.setPadding(WatchUiUtils.px(this, 4), WatchUiUtils.px(this, 4),
-                WatchUiUtils.px(this, 4), WatchUiUtils.px(this, 4));
-        container.addView(ivQrCode);
+        ivQrCode.setPadding(px(4), px(4), px(4), px(4));
+        qrCard.addView(ivQrCode);
 
-        // Status text
         tvStatus = new TextView(this);
         tvStatus.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         tvStatus.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        tvStatus.setTextSize(11);
         tvStatus.setGravity(Gravity.CENTER);
-        tvStatus.setPadding(0, WatchUiUtils.px(this, 8), 0, WatchUiUtils.px(this, 4));
-        container.addView(tvStatus);
+        tvStatus.setPadding(0, px(8), 0, px(4));
+        qrCard.addView(tvStatus);
 
-        // Refresh button
-        btnRefresh = new TextView(this);
+        btnRefresh = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
         btnRefresh.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
         btnRefresh.setText("刷新二维码");
-        btnRefresh.setTextColor(0xFF64B5F6);
-        btnRefresh.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
-        btnRefresh.setGravity(Gravity.CENTER);
-        btnRefresh.setPadding(WatchUiUtils.px(this, 16), WatchUiUtils.px(this, 8),
-                WatchUiUtils.px(this, 16), WatchUiUtils.px(this, 8));
-        btnRefresh.setClickable(true);
-        btnRefresh.setFocusable(true);
+        btnRefresh.setTextSize(12);
+        btnRefresh.setAllCaps(false);
         btnRefresh.setOnClickListener(v -> startQrLogin());
-        container.addView(btnRefresh);
+        qrCard.addView(btnRefresh);
 
         scrollView.addView(container);
         setContentView(scrollView);
@@ -226,6 +215,36 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         if (cookie == null || cookie.isEmpty()) return;
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         prefs.edit().putString("bilibili_cookie", cookie).apply();
+    }
+
+    private LinearLayout createTitleBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView back = new ImageView(this);
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setImageResource(R.drawable.ic_arrow_back);
+        back.setColorFilter(getResources().getColor(R.color.text_primary));
+        back.setOnClickListener(v -> finish());
+        bar.addView(back);
+
+        TextView title = new TextView(this);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        title.setLayoutParams(titleParams);
+        title.setGravity(Gravity.CENTER);
+        title.setText("B站扫码登录");
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(14);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        bar.addView(title);
+
+        ImageView placeholder = new ImageView(this);
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        bar.addView(placeholder);
+        return bar;
     }
 
     @Override

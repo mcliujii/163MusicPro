@@ -4,9 +4,11 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.InputType;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -16,6 +18,8 @@ import android.widget.Toast;
 import com.google.android.material.button.MaterialButton;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
+import com.qinghe.music163pro.manager.BilibiliFavoritesManager;
+import com.qinghe.music163pro.model.BilibiliFavorite;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 import com.qinghe.music163pro.util.WatchUiUtils;
@@ -33,11 +37,17 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
     private LinearLayout llPagesList;
     private TextView tvStatus;
     private MaterialButton btnFetch;
+    private MaterialButton btnFavorite;
+    private BilibiliFavoritesManager favoritesManager;
     private final List<BilibiliApiHelper.BilibiliPage> fetchedPages = new ArrayList<>();
+    private String currentBvid = "";
+    private String currentTitle = "";
+    private String currentOwner = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        favoritesManager = new BilibiliFavoritesManager(this);
 
         ScrollView scrollView = new ScrollView(this);
         scrollView.setBackgroundColor(getResources().getColor(R.color.bg_dark));
@@ -45,69 +55,69 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(WatchUiUtils.px(this, 12), WatchUiUtils.px(this, 8),
-                WatchUiUtils.px(this, 12), WatchUiUtils.px(this, 8));
+        container.setPadding(px(10), px(8), px(10), px(10));
 
-        // Title
-        TextView tvTitle = new TextView(this);
-        tvTitle.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        tvTitle.setText("从BV号打开");
-        tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, 0, 0, WatchUiUtils.px(this, 8));
-        container.addView(tvTitle);
+        container.addView(createTitleBar());
 
-        // BV ID label
+        LinearLayout inputCard = new LinearLayout(this);
+        inputCard.setOrientation(LinearLayout.VERTICAL);
+        inputCard.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        inputCard.setPadding(px(10), px(10), px(10), px(10));
+        container.addView(inputCard);
+
         TextView tvLabel = new TextView(this);
         tvLabel.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         tvLabel.setText("输入BV号");
         tvLabel.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvLabel.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
-        tvLabel.setPadding(0, 0, 0, WatchUiUtils.px(this, 4));
-        container.addView(tvLabel);
+        tvLabel.setTextSize(11);
+        tvLabel.setPadding(0, 0, 0, px(4));
+        inputCard.addView(tvLabel);
 
-        // BV ID input
         etBvid = new EditText(this);
         etBvid.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, WatchUiUtils.px(this, 40)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(38)));
         etBvid.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
         etBvid.setHint("BV1xxxxxxxxx");
         etBvid.setTextColor(getResources().getColor(R.color.text_primary));
         etBvid.setHintTextColor(getResources().getColor(R.color.text_disabled));
-        etBvid.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+        etBvid.setTextSize(12);
         etBvid.setInputType(InputType.TYPE_CLASS_TEXT);
-        etBvid.setPadding(WatchUiUtils.px(this, 8), WatchUiUtils.px(this, 4),
-                WatchUiUtils.px(this, 8), WatchUiUtils.px(this, 4));
+        etBvid.setPadding(px(8), px(4), px(8), px(4));
         etBvid.setSingleLine(true);
-        container.addView(etBvid);
+        inputCard.addView(etBvid);
 
-        // Fetch button
         btnFetch = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, WatchUiUtils.px(this, 36));
-        btnParams.topMargin = WatchUiUtils.px(this, 8);
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34));
+        btnParams.topMargin = px(8);
         btnFetch.setLayoutParams(btnParams);
         btnFetch.setText("解析视频");
-        btnFetch.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 13);
+        btnFetch.setTextSize(12);
         btnFetch.setAllCaps(false);
         btnFetch.setOnClickListener(v -> fetchVideo());
-        container.addView(btnFetch);
+        inputCard.addView(btnFetch);
 
-        // Status text
         tvStatus = new TextView(this);
         tvStatus.setLayoutParams(new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         tvStatus.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
-        tvStatus.setPadding(0, WatchUiUtils.px(this, 6), 0, WatchUiUtils.px(this, 4));
+        tvStatus.setTextSize(11);
+        tvStatus.setPadding(0, px(8), 0, px(4));
         tvStatus.setVisibility(View.GONE);
         container.addView(tvStatus);
 
-        // Pages list container
+        btnFavorite = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+        ((LinearLayout.LayoutParams) btnFavorite.getLayoutParams()).topMargin = px(4);
+        btnFavorite.setText("收藏BV号");
+        btnFavorite.setTextSize(12);
+        btnFavorite.setAllCaps(false);
+        btnFavorite.setVisibility(View.GONE);
+        btnFavorite.setOnClickListener(v -> toggleFavoriteCurrentBvid());
+        container.addView(btnFavorite);
+
         llPagesList = new LinearLayout(this);
         llPagesList.setOrientation(LinearLayout.VERTICAL);
         llPagesList.setLayoutParams(new LinearLayout.LayoutParams(
@@ -134,6 +144,7 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         btnFetch.setEnabled(false);
         tvStatus.setVisibility(View.VISIBLE);
         tvStatus.setText("正在解析视频...");
+        btnFavorite.setVisibility(View.GONE);
         llPagesList.removeAllViews();
         fetchedPages.clear();
 
@@ -151,54 +162,54 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
 
                 fetchedPages.clear();
                 fetchedPages.addAll(pages);
+                currentBvid = finalBvid;
+                currentTitle = pages.get(0).videoTitle;
+                currentOwner = pages.get(0).ownerName;
 
-                String title = pages.get(0).videoTitle;
-                String owner = pages.get(0).ownerName;
-                tvStatus.setText(title + " - " + owner + "\n共" + pages.size() + "集");
+                tvStatus.setText(currentTitle + " - " + currentOwner + "\n共" + pages.size() + "集");
 
-                // Show "Play All" button
                 MaterialButton btnPlayAll = new MaterialButton(
                         BilibiliBvidActivity.this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
                 LinearLayout.LayoutParams playAllParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, WatchUiUtils.px(BilibiliBvidActivity.this, 36));
-                playAllParams.topMargin = WatchUiUtils.px(BilibiliBvidActivity.this, 4);
+                        ViewGroup.LayoutParams.MATCH_PARENT, px(34));
+                playAllParams.topMargin = px(4);
                 btnPlayAll.setLayoutParams(playAllParams);
                 btnPlayAll.setText("全部播放 (" + pages.size() + "集)");
-                btnPlayAll.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+                btnPlayAll.setTextSize(12);
                 btnPlayAll.setAllCaps(false);
                 btnPlayAll.setOnClickListener(v -> playAll(0));
                 llPagesList.addView(btnPlayAll);
 
-                // List each page
+                updateFavoriteButton();
+                btnFavorite.setVisibility(View.VISIBLE);
+
                 for (int i = 0; i < pages.size(); i++) {
                     BilibiliApiHelper.BilibiliPage page = pages.get(i);
                     final int index = i;
 
                     LinearLayout row = new LinearLayout(BilibiliBvidActivity.this);
-                    row.setLayoutParams(new LinearLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            WatchUiUtils.px(BilibiliBvidActivity.this, 44)));
+                    LinearLayout.LayoutParams rowParams = new LinearLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+                    rowParams.topMargin = px(6);
+                    row.setLayoutParams(rowParams);
                     row.setOrientation(LinearLayout.HORIZONTAL);
                     row.setGravity(Gravity.CENTER_VERTICAL);
-                    row.setPadding(WatchUiUtils.px(BilibiliBvidActivity.this, 4), 0,
-                            WatchUiUtils.px(BilibiliBvidActivity.this, 4), 0);
+                    row.setPadding(px(10), px(8), px(10), px(8));
                     row.setClickable(true);
                     row.setFocusable(true);
-                    row.setBackgroundResource(android.R.drawable.list_selector_background);
+                    row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
                     row.setOnClickListener(v -> playAll(index));
 
-                    // Page number
                     TextView tvNum = new TextView(BilibiliBvidActivity.this);
                     tvNum.setLayoutParams(new LinearLayout.LayoutParams(
-                            WatchUiUtils.px(BilibiliBvidActivity.this, 28),
+                            px(24),
                             ViewGroup.LayoutParams.WRAP_CONTENT));
                     tvNum.setText(String.valueOf(page.page));
                     tvNum.setTextColor(getResources().getColor(R.color.text_secondary));
-                    tvNum.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+                    tvNum.setTextSize(11);
                     tvNum.setGravity(Gravity.CENTER);
                     row.addView(tvNum);
 
-                    // Page title + duration
                     LinearLayout infoCol = new LinearLayout(BilibiliBvidActivity.this);
                     infoCol.setOrientation(LinearLayout.VERTICAL);
                     infoCol.setLayoutParams(new LinearLayout.LayoutParams(
@@ -207,15 +218,15 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                     TextView tvPart = new TextView(BilibiliBvidActivity.this);
                     tvPart.setText(page.part.isEmpty() ? page.videoTitle : page.part);
                     tvPart.setTextColor(getResources().getColor(R.color.text_primary));
-                    tvPart.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 12);
+                    tvPart.setTextSize(12);
                     tvPart.setSingleLine(true);
-                    tvPart.setEllipsize(android.text.TextUtils.TruncateAt.END);
+                    tvPart.setEllipsize(TextUtils.TruncateAt.END);
                     infoCol.addView(tvPart);
 
                     TextView tvDur = new TextView(BilibiliBvidActivity.this);
-                    tvDur.setText(formatDuration(page.duration));
+                    tvDur.setText(formatDuration(page.duration) + " · " + currentBvid);
                     tvDur.setTextColor(getResources().getColor(R.color.text_secondary));
-                    tvDur.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 10);
+                    tvDur.setTextSize(10);
                     infoCol.addView(tvDur);
 
                     row.addView(infoCol);
@@ -285,6 +296,55 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
     private String getBilibiliCookie() {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         return prefs.getString("bilibili_cookie", "");
+    }
+
+    private LinearLayout createTitleBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView back = new ImageView(this);
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setImageResource(R.drawable.ic_arrow_back);
+        back.setColorFilter(getResources().getColor(R.color.text_primary));
+        back.setOnClickListener(v -> finish());
+        bar.addView(back);
+
+        TextView title = new TextView(this);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        title.setLayoutParams(titleParams);
+        title.setGravity(Gravity.CENTER);
+        title.setText("从BV号打开");
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(14);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        bar.addView(title);
+
+        ImageView placeholder = new ImageView(this);
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        bar.addView(placeholder);
+        return bar;
+    }
+
+    private void updateFavoriteButton() {
+        boolean favorite = !TextUtils.isEmpty(currentBvid) && favoritesManager.isFavorite(currentBvid);
+        btnFavorite.setText(favorite ? "取消收藏BV号" : "收藏BV号");
+    }
+
+    private void toggleFavoriteCurrentBvid() {
+        if (TextUtils.isEmpty(currentBvid)) {
+            return;
+        }
+        if (favoritesManager.isFavorite(currentBvid)) {
+            favoritesManager.removeFavorite(currentBvid);
+            Toast.makeText(this, "已取消收藏BV号", Toast.LENGTH_SHORT).show();
+        } else {
+            favoritesManager.addFavorite(new BilibiliFavorite(currentBvid, currentTitle, currentOwner));
+            Toast.makeText(this, "已收藏BV号", Toast.LENGTH_SHORT).show();
+        }
+        updateFavoriteButton();
     }
 
     private String formatDuration(int seconds) {

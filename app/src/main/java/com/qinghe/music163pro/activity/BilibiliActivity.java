@@ -3,6 +3,7 @@ package com.qinghe.music163pro.activity;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -30,24 +31,16 @@ public class BilibiliActivity extends BaseWatchActivity {
 
         LinearLayout container = new LinearLayout(this);
         container.setOrientation(LinearLayout.VERTICAL);
-        container.setPadding(0, WatchUiUtils.px(this, 8), 0, WatchUiUtils.px(this, 8));
+        container.setPadding(px(10), px(8), px(10), px(10));
 
-        // Title
-        TextView tvTitle = new TextView(this);
-        tvTitle.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        tvTitle.setText("听bilibili");
-        tvTitle.setTextColor(getResources().getColor(R.color.text_primary));
-        tvTitle.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
-        tvTitle.setTypeface(null, android.graphics.Typeface.BOLD);
-        tvTitle.setGravity(Gravity.CENTER);
-        tvTitle.setPadding(0, WatchUiUtils.px(this, 4), 0, WatchUiUtils.px(this, 8));
-        tvTitle.setLetterSpacing(0.1f);
-        container.addView(tvTitle);
+        container.addView(createTitleBar());
 
         // Menu item: 从BV号打开
         container.addView(createMenuItem(R.drawable.ic_video_library, "从BV号打开",
                 () -> startActivity(new Intent(this, BilibiliBvidActivity.class))));
+
+        container.addView(createMenuItem(R.drawable.ic_favorite_border, "收藏",
+                () -> startActivity(new Intent(this, BilibiliFavoritesActivity.class))));
 
         // Menu item: 登录
         container.addView(createMenuItem(R.drawable.ic_qr_code, "登录B站",
@@ -59,13 +52,17 @@ public class BilibiliActivity extends BaseWatchActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         statusRow.setOrientation(LinearLayout.HORIZONTAL);
         statusRow.setGravity(Gravity.CENTER_VERTICAL);
-        statusRow.setPadding(WatchUiUtils.px(this, 16), WatchUiUtils.px(this, 12),
-                WatchUiUtils.px(this, 16), WatchUiUtils.px(this, 4));
+        LinearLayout.LayoutParams statusParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        statusParams.topMargin = px(8);
+        statusRow.setLayoutParams(statusParams);
+        statusRow.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
+        statusRow.setPadding(px(10), px(8), px(10), px(8));
 
         TextView tvLoginStatus = new TextView(this);
         tvLoginStatus.setId(android.R.id.text1);
         tvLoginStatus.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvLoginStatus.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 11);
+        tvLoginStatus.setTextSize(11);
         updateLoginStatus(tvLoginStatus);
         statusRow.addView(tvLoginStatus);
         container.addView(statusRow);
@@ -86,28 +83,60 @@ public class BilibiliActivity extends BaseWatchActivity {
     private void updateLoginStatus(TextView tv) {
         SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
         String cookie = prefs.getString("bilibili_cookie", "");
-        if (cookie != null && !cookie.isEmpty() && cookie.contains("SESSDATA")) {
+        if (!TextUtils.isEmpty(cookie) && cookie.contains("SESSDATA")) {
             tv.setText("已登录B站");
         } else {
             tv.setText("未登录B站（不影响大部分功能）");
         }
     }
 
+    private LinearLayout createTitleBar() {
+        LinearLayout bar = new LinearLayout(this);
+        bar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(34)));
+        bar.setGravity(Gravity.CENTER_VERTICAL);
+
+        ImageView back = new ImageView(this);
+        back.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        back.setImageResource(R.drawable.ic_arrow_back);
+        back.setColorFilter(getResources().getColor(R.color.text_primary));
+        back.setOnClickListener(v -> finish());
+        bar.addView(back);
+
+        TextView title = new TextView(this);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(0,
+                ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
+        title.setLayoutParams(titleParams);
+        title.setGravity(Gravity.CENTER);
+        title.setText("听bilibili");
+        title.setTextColor(getResources().getColor(R.color.text_primary));
+        title.setTextSize(14);
+        title.setTypeface(null, android.graphics.Typeface.BOLD);
+        bar.addView(title);
+
+        ImageView placeholder = new ImageView(this);
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        bar.addView(placeholder);
+        return bar;
+    }
+
     private LinearLayout createMenuItem(int iconRes, String label, Runnable onClick) {
         LinearLayout row = new LinearLayout(this);
-        row.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, WatchUiUtils.px(this, 48)));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, px(44));
+        params.topMargin = px(6);
+        row.setLayoutParams(params);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setGravity(Gravity.CENTER_VERTICAL);
-        row.setPadding(WatchUiUtils.px(this, 16), 0, WatchUiUtils.px(this, 16), 0);
+        row.setPadding(px(12), 0, px(12), 0);
         row.setClickable(true);
         row.setFocusable(true);
-        row.setBackgroundResource(android.R.drawable.list_selector_background);
+        row.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
         row.setOnClickListener(v -> onClick.run());
 
         ImageView icon = new ImageView(this);
         LinearLayout.LayoutParams iconParams = new LinearLayout.LayoutParams(
-                WatchUiUtils.px(this, 20), WatchUiUtils.px(this, 20));
+                px(18), px(18));
         icon.setLayoutParams(iconParams);
         icon.setImageResource(iconRes);
         icon.setAlpha(0.7f);
@@ -116,11 +145,11 @@ public class BilibiliActivity extends BaseWatchActivity {
         TextView tv = new TextView(this);
         LinearLayout.LayoutParams tvParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        tvParams.setMarginStart(WatchUiUtils.px(this, 12));
+        tvParams.setMarginStart(px(10));
         tv.setLayoutParams(tvParams);
         tv.setText(label);
         tv.setTextColor(getResources().getColor(R.color.text_primary));
-        tv.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP, 14);
+        tv.setTextSize(13);
         row.addView(tv);
 
         return row;

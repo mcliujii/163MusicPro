@@ -254,7 +254,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
         // Playlist indicator: click to open playlist detail
         btnPlaylistIndicator.setOnClickListener(v -> {
-            if (playerManager.hasSourcePlaylist()) {
+            Song currentSong = playerManager.getCurrentSong();
+            if (currentSong != null && currentSong.isBilibili()) {
+                openBilibiliPlaylist(currentSong);
+            } else if (playerManager.hasSourcePlaylist()) {
                 Intent plIntent = new Intent(MainActivity.this, PlaylistDetailActivity.class);
                 plIntent.putExtra("playlist_id", playerManager.getSourcePlaylistId());
                 plIntent.putExtra("playlist_name", playerManager.getSourcePlaylistName());
@@ -404,6 +407,10 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         Song song = playerManager.getCurrentSong();
         if (song == null) {
             Toast.makeText(this, "暂无歌曲", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (song.isBilibili()) {
+            showBilibiliFunctionsOverlay(song);
             return;
         }
 
@@ -559,6 +566,99 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         row5.addView(createFuncItem(R.drawable.ic_add_box, "添加到歌单",
                 v -> onFuncAddToPlaylist(song)));
         contentLayout.addView(row5);
+
+        scrollView.addView(contentLayout);
+        overlayContainer.addView(scrollView);
+        rootView.addView(overlayContainer);
+    }
+
+    private void showBilibiliFunctionsOverlay(Song song) {
+        FrameLayout rootView = (FrameLayout) getWindow().getDecorView().findViewById(android.R.id.content);
+
+        overlayContainer = new FrameLayout(this);
+        overlayContainer.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT));
+        overlayContainer.setBackgroundColor(0xCC000000);
+        addSwipeToDismiss(overlayContainer);
+
+        ScrollView scrollView = new ScrollView(this);
+        FrameLayout.LayoutParams scrollParams = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.WRAP_CONTENT);
+        scrollParams.gravity = Gravity.CENTER;
+        scrollView.setLayoutParams(scrollParams);
+        scrollView.setOnClickListener(v -> { });
+
+        LinearLayout contentLayout = new LinearLayout(this);
+        contentLayout.setOrientation(LinearLayout.VERTICAL);
+        contentLayout.setGravity(Gravity.CENTER);
+        contentLayout.setPadding(dp(16), dp(12), dp(16), dp(12));
+        contentLayout.addView(createOverlayTitleBar("B站功能"));
+
+        LinearLayout row1 = new LinearLayout(this);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
+        row1.setGravity(Gravity.CENTER);
+        row1.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        row1.addView(createFuncItem(R.drawable.ic_queue_music, "BV列表",
+                v -> onFuncShowBilibiliPlaylist(song)));
+        LinearLayout timerItem = createFuncItem(R.drawable.ic_timer,
+                playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
+                v -> onFuncSleepTimer());
+        row1.addView(timerItem);
+        contentLayout.addView(row1);
+
+        final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
+        if (playerManager.isSleepTimerActive()) {
+            overlayTimerHandler = new Handler();
+            overlayTimerRunnable = new Runnable() {
+                @Override
+                public void run() {
+                    if (overlayContainer == null) return;
+                    long remainMs = playerManager.getSleepTimerRemainingMs();
+                    if (remainMs > 0) {
+                        int totalSec = (int) (remainMs / 1000);
+                        int min = totalSec / 60;
+                        int sec = totalSec % 60;
+                        timerLabelView.setText(String.format("定时 %d:%02d", min, sec));
+                        overlayTimerHandler.postDelayed(this, 1000);
+                    } else {
+                        timerLabelView.setText("定时关闭");
+                    }
+                }
+            };
+            overlayTimerRunnable.run();
+        }
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        row2.setGravity(Gravity.CENTER);
+        row2.setPadding(0, dp(4), 0, 0);
+        row2.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        int playModeIconRes;
+        String playModeLabel;
+        switch (playerManager.getPlayMode()) {
+            case SINGLE_REPEAT:
+                playModeIconRes = R.drawable.ic_repeat_one;
+                playModeLabel = "单曲循环";
+                break;
+            case RANDOM:
+                playModeIconRes = R.drawable.ic_shuffle;
+                playModeLabel = "随机播放";
+                break;
+            case LIST_LOOP:
+            default:
+                playModeIconRes = R.drawable.ic_repeat;
+                playModeLabel = "列表循环";
+                break;
+        }
+        row2.addView(createFuncItem(playModeIconRes, playModeLabel,
+                v -> onFuncCyclePlayMode()));
+        float currentSpeed = playerManager.getPlaybackSpeed();
+        String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
+        row2.addView(createFuncItem(R.drawable.ic_speed, speedLabel,
+                v -> onFuncPlaybackSpeed()));
+        contentLayout.addView(row2);
 
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);
@@ -1636,6 +1736,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         showPlaylistOverlay();
     }
 
+    private void onFuncShowBilibiliPlaylist(Song song) {
+        dismissOverlay();
+        openBilibiliPlaylist(song);
+    }
+
+    private void openBilibiliPlaylist(Song song) {
+        if (song == null || !song.isBilibili()) {
+            return;
+        }
+        Intent intent = new Intent(this, BilibiliPlaylistActivity.class);
+        intent.putExtra("bvid", song.getBvid());
+        intent.putExtra("video_title", song.getAlbum());
+        intent.putExtra("owner_name", song.getArtist());
+        startActivity(intent);
+    }
+
     /**
      * Show the current playlist as an overlay with song list.
      * Tapping a song plays it and dismisses the overlay.
@@ -2557,7 +2673,9 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
 
     private void updatePlaylistIndicator() {
         if (btnPlaylistIndicator != null) {
-            if (playerManager.hasSourcePlaylist()) {
+            Song currentSong = playerManager.getCurrentSong();
+            if (playerManager.hasSourcePlaylist()
+                    || (currentSong != null && currentSong.isBilibili())) {
                 btnPlaylistIndicator.setVisibility(View.VISIBLE);
             } else {
                 btnPlaylistIndicator.setVisibility(View.GONE);
