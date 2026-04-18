@@ -536,22 +536,34 @@ public class BilibiliApiHelper {
                                                FavoriteFolderVideosCallback callback) {
         executor.execute(() -> {
             try {
-                String url = "https://api.bilibili.com/x/v3/fav/resource/list?media_id=" + mediaId
-                        + "&pn=1&ps=20&platform=web";
-                String response = httpGet(url, cookie);
-                JSONObject json = new JSONObject(response);
-                int code = json.optInt("code", -1);
-                if (code != 0) {
-                    postError(callback, json.optString("message", "加载收藏夹视频失败"));
-                    return;
-                }
-
-                JSONObject data = json.optJSONObject("data");
-                JSONObject info = data != null ? data.optJSONObject("info") : null;
-                String folderTitle = info != null ? info.optString("title", "") : "";
-                JSONArray medias = data != null ? data.optJSONArray("medias") : null;
                 List<BilibiliSearchVideo> videos = new ArrayList<>();
-                if (medias != null) {
+                String folderTitle = "";
+                final int pageSize = 20;
+                int pageNum = 1;
+                int totalCount = Integer.MAX_VALUE;
+
+                while (videos.size() < totalCount) {
+                    String url = "https://api.bilibili.com/x/v3/fav/resource/list?media_id=" + mediaId
+                            + "&pn=" + pageNum + "&ps=" + pageSize + "&platform=web";
+                    String response = httpGet(url, cookie);
+                    JSONObject json = new JSONObject(response);
+                    int code = json.optInt("code", -1);
+                    if (code != 0) {
+                        postError(callback, json.optString("message", "加载收藏夹视频失败"));
+                        return;
+                    }
+
+                    JSONObject data = json.optJSONObject("data");
+                    JSONObject info = data != null ? data.optJSONObject("info") : null;
+                    if (pageNum == 1 && info != null) {
+                        folderTitle = info.optString("title", "");
+                        totalCount = Math.max(info.optInt("media_count", 0), 0);
+                    }
+                    JSONArray medias = data != null ? data.optJSONArray("medias") : null;
+                    if (medias == null || medias.length() == 0) {
+                        break;
+                    }
+
                     for (int i = 0; i < medias.length(); i++) {
                         JSONObject item = medias.getJSONObject(i);
                         JSONObject upper = item.optJSONObject("upper");
@@ -564,8 +576,14 @@ public class BilibiliApiHelper {
                                 item.optInt("duration", 0)
                         ));
                     }
+
+                    if (medias.length() < pageSize) {
+                        break;
+                    }
+                    pageNum++;
                 }
-                mainHandler.post(() -> callback.onResult(folderTitle, videos));
+                final String resolvedFolderTitle = folderTitle;
+                mainHandler.post(() -> callback.onResult(resolvedFolderTitle, videos));
             } catch (Exception e) {
                 Log.e(TAG, "getFavoriteFolderVideos error", e);
                 postError(callback, e.getMessage());

@@ -86,14 +86,19 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         etBvid.setSingleLine(true);
         inputCard.addView(etBvid);
 
-        btnFetch = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
+        btnFetch = new MaterialButton(this, null, 0, R.style.Widget_App_Button);
         LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(42));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(36));
         btnParams.topMargin = px(8);
         btnFetch.setLayoutParams(btnParams);
         btnFetch.setText("解析视频");
-        btnFetch.setTextSize(12);
+        btnFetch.setTextColor(getResources().getColor(R.color.text_primary));
+        btnFetch.setTextSize(13);
         btnFetch.setAllCaps(false);
+        btnFetch.setInsetTop(0);
+        btnFetch.setInsetBottom(0);
+        btnFetch.setMinHeight(0);
+        btnFetch.setMinimumHeight(0);
         btnFetch.setOnClickListener(v -> fetchVideo());
         inputCard.addView(btnFetch);
 
@@ -106,13 +111,18 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
         tvStatus.setVisibility(View.GONE);
         container.addView(tvStatus);
 
-        btnFavorite = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnFavorite = new MaterialButton(this, null, 0, R.style.Widget_App_Button_Outlined);
         btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
         ((LinearLayout.LayoutParams) btnFavorite.getLayoutParams()).topMargin = px(4);
         btnFavorite.setText("收藏BV号");
-        btnFavorite.setTextSize(12);
+        btnFavorite.setTextColor(getResources().getColor(R.color.text_primary));
+        btnFavorite.setTextSize(13);
         btnFavorite.setAllCaps(false);
+        btnFavorite.setInsetTop(0);
+        btnFavorite.setInsetBottom(0);
+        btnFavorite.setMinHeight(0);
+        btnFavorite.setMinimumHeight(0);
         btnFavorite.setVisibility(View.GONE);
         btnFavorite.setOnClickListener(v -> toggleFavoriteCurrentBvid());
         container.addView(btnFavorite);
@@ -168,14 +178,19 @@ public class BilibiliBvidActivity extends BaseWatchActivity {
                 tvStatus.setText(currentTitle + " - " + currentOwner + "\n共" + pages.size() + "集");
 
                 MaterialButton btnPlayAll = new MaterialButton(
-                        BilibiliBvidActivity.this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+                        BilibiliBvidActivity.this, null, 0, R.style.Widget_App_Button_Outlined);
                 LinearLayout.LayoutParams playAllParams = new LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, px(42));
+                        ViewGroup.LayoutParams.MATCH_PARENT, px(36));
                 playAllParams.topMargin = px(4);
                 btnPlayAll.setLayoutParams(playAllParams);
                 btnPlayAll.setText("全部播放 (" + pages.size() + "集)");
-                btnPlayAll.setTextSize(12);
+                btnPlayAll.setTextColor(getResources().getColor(R.color.text_primary));
+                btnPlayAll.setTextSize(13);
                 btnPlayAll.setAllCaps(false);
+                btnPlayAll.setInsetTop(0);
+                btnPlayAll.setInsetBottom(0);
+                btnPlayAll.setMinHeight(0);
+                btnPlayAll.setMinimumHeight(0);
                 btnPlayAll.setOnClickListener(v -> playAll(0));
                 llPagesList.addView(btnPlayAll);
 

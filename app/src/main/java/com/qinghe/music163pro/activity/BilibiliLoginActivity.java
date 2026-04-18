@@ -76,12 +76,17 @@ public class BilibiliLoginActivity extends BaseWatchActivity {
         tvStatus.setPadding(0, px(8), 0, px(4));
         qrCard.addView(tvStatus);
 
-        btnRefresh = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonOutlinedStyle);
+        btnRefresh = new MaterialButton(this, null, 0, R.style.Widget_App_Button_Outlined);
         btnRefresh.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
         btnRefresh.setText("刷新二维码");
-        btnRefresh.setTextSize(12);
+        btnRefresh.setTextColor(getResources().getColor(R.color.text_primary));
+        btnRefresh.setTextSize(13);
         btnRefresh.setAllCaps(false);
+        btnRefresh.setInsetTop(0);
+        btnRefresh.setInsetBottom(0);
+        btnRefresh.setMinHeight(0);
+        btnRefresh.setMinimumHeight(0);
         btnRefresh.setOnClickListener(v -> startQrLogin());
         qrCard.addView(btnRefresh);
 

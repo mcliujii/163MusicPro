@@ -70,13 +70,18 @@ public class BilibiliSearchActivity extends BaseWatchActivity {
         etKeyword.setSingleLine(true);
         card.addView(etKeyword);
 
-        btnSearch = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
+        btnSearch = new MaterialButton(this, null, 0, R.style.Widget_App_Button);
         btnSearch.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
         ((LinearLayout.LayoutParams) btnSearch.getLayoutParams()).topMargin = px(8);
         btnSearch.setText("搜索");
+        btnSearch.setTextColor(getResources().getColor(R.color.text_primary));
         btnSearch.setTextSize(13);
         btnSearch.setAllCaps(false);
+        btnSearch.setInsetTop(0);
+        btnSearch.setInsetBottom(0);
+        btnSearch.setMinHeight(0);
+        btnSearch.setMinimumHeight(0);
         btnSearch.setOnClickListener(v -> searchVideos());
         card.addView(btnSearch);
 

@@ -65,12 +65,17 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         tvSubtitle.setPadding(0, 0, 0, px(8));
         root.addView(tvSubtitle);
 
-        btnPlayAll = new MaterialButton(this, null, com.google.android.material.R.attr.materialButtonStyle);
+        btnPlayAll = new MaterialButton(this, null, 0, R.style.Widget_App_Button);
         btnPlayAll.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, px(42)));
+                ViewGroup.LayoutParams.MATCH_PARENT, px(36)));
         btnPlayAll.setText("全部播放");
         btnPlayAll.setAllCaps(false);
-        btnPlayAll.setTextSize(12);
+        btnPlayAll.setTextColor(getResources().getColor(R.color.text_primary));
+        btnPlayAll.setTextSize(13);
+        btnPlayAll.setInsetTop(0);
+        btnPlayAll.setInsetBottom(0);
+        btnPlayAll.setMinHeight(0);
+        btnPlayAll.setMinimumHeight(0);
         btnPlayAll.setOnClickListener(v -> playIndex(0));
         root.addView(btnPlayAll);
 

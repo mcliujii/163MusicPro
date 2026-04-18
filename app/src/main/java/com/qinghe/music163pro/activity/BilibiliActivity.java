@@ -136,7 +136,7 @@ public class BilibiliActivity extends BaseWatchActivity {
         bar.addView(title);
 
         ImageView placeholder = new ImageView(this);
-        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(20), px(20)));
+        placeholder.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         bar.addView(placeholder);
         return bar;
     }
