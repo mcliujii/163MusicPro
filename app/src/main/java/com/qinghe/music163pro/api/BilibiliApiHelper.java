@@ -37,7 +37,7 @@ public class BilibiliApiHelper {
     private static final int CONNECT_TIMEOUT_MS = 15000;
     private static final int READ_TIMEOUT_MS = 15000;
 
-    private static final ExecutorService executor = Executors.newCachedThreadPool();
+    private static final ExecutorService executor = Executors.newFixedThreadPool(4);
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
     // ======================== Callback Interfaces ========================
@@ -228,11 +228,7 @@ public class BilibiliApiHelper {
                 if (dash != null) {
                     JSONArray audioArray = dash.optJSONArray("audio");
                     if (audioArray != null && audioArray.length() > 0) {
-                        JSONObject firstAudio = audioArray.getJSONObject(0);
-                        audioUrl = firstAudio.optString("baseUrl", null);
-                        if (audioUrl == null || audioUrl.isEmpty()) {
-                            audioUrl = firstAudio.optString("base_url", null);
-                        }
+                        audioUrl = pickPreferredAudioUrl(audioArray);
                     }
                 }
 
@@ -602,9 +598,10 @@ public class BilibiliApiHelper {
 
             int code = conn.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
-                // Try reading error stream
-                InputStream errStream = conn.getErrorStream();
-                String errBody = errStream != null ? readStream(errStream) : "";
+                String errBody;
+                try (InputStream errStream = conn.getErrorStream()) {
+                    errBody = errStream != null ? readStream(errStream) : "";
+                }
                 throw new Exception("HTTP " + code + ": " + errBody);
             }
 
@@ -640,6 +637,45 @@ public class BilibiliApiHelper {
             }
             return sb.toString();
         }
+    }
+
+    private static String pickPreferredAudioUrl(JSONArray audioArray) throws Exception {
+        String bestUrl = null;
+        int bestBandwidth = Integer.MAX_VALUE;
+        for (int i = 0; i < audioArray.length(); i++) {
+            JSONObject audioItem = audioArray.getJSONObject(i);
+            String candidateUrl = extractAudioUrl(audioItem);
+            if (candidateUrl == null || candidateUrl.isEmpty()) {
+                continue;
+            }
+            int bandwidth = audioItem.optInt("bandwidth", Integer.MAX_VALUE);
+            if (bestUrl == null || bandwidth < bestBandwidth) {
+                bestUrl = candidateUrl;
+                bestBandwidth = bandwidth;
+            }
+        }
+        return bestUrl;
+    }
+
+    private static String extractAudioUrl(JSONObject audioItem) {
+        if (audioItem == null) {
+            return null;
+        }
+        String url = audioItem.optString("baseUrl", null);
+        if (url == null || url.isEmpty()) {
+            url = audioItem.optString("base_url", null);
+        }
+        if (url != null && !url.isEmpty()) {
+            return url;
+        }
+        JSONArray backupUrls = audioItem.optJSONArray("backupUrl");
+        if (backupUrls == null || backupUrls.length() == 0) {
+            backupUrls = audioItem.optJSONArray("backup_url");
+        }
+        if (backupUrls != null && backupUrls.length() > 0) {
+            return backupUrls.optString(0, null);
+        }
+        return null;
     }
 
     private static String formatLrcTime(double seconds) {

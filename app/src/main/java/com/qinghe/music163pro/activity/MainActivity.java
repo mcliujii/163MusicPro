@@ -601,11 +601,20 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
                 LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         row1.addView(createFuncItem(R.drawable.ic_queue_music, "视频列表",
                 v -> onFuncShowBilibiliPlaylist(song)));
+        row1.addView(createFuncItem(R.drawable.ic_get_app, "下载",
+                v -> onFuncDownload(song)));
+        contentLayout.addView(row1);
+
+        LinearLayout row2 = new LinearLayout(this);
+        row2.setOrientation(LinearLayout.HORIZONTAL);
+        row2.setGravity(Gravity.CENTER);
+        row2.setPadding(0, dp(4), 0, 0);
+        row2.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         LinearLayout timerItem = createFuncItem(R.drawable.ic_timer,
                 playerManager.isSleepTimerActive() ? "定时..." : "定时关闭",
                 v -> onFuncSleepTimer());
-        row1.addView(timerItem);
-        contentLayout.addView(row1);
+        row2.addView(timerItem);
 
         final TextView timerLabelView = (TextView) timerItem.getChildAt(1);
         if (playerManager.isSleepTimerActive()) {
@@ -628,13 +637,6 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             };
             overlayTimerRunnable.run();
         }
-
-        LinearLayout row2 = new LinearLayout(this);
-        row2.setOrientation(LinearLayout.HORIZONTAL);
-        row2.setGravity(Gravity.CENTER);
-        row2.setPadding(0, dp(4), 0, 0);
-        row2.setLayoutParams(new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         int playModeIconRes;
         String playModeLabel;
         switch (playerManager.getPlayMode()) {
@@ -654,11 +656,22 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         }
         row2.addView(createFuncItem(playModeIconRes, playModeLabel,
                 v -> onFuncCyclePlayMode()));
+        contentLayout.addView(row2);
+
+        LinearLayout row3 = new LinearLayout(this);
+        row3.setOrientation(LinearLayout.HORIZONTAL);
+        row3.setGravity(Gravity.CENTER);
+        row3.setPadding(0, dp(4), 0, 0);
+        row3.setLayoutParams(new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         float currentSpeed = playerManager.getPlaybackSpeed();
         String speedLabel = currentSpeed == 1.0f ? "倍速播放" : String.format("%.1fx", currentSpeed);
-        row2.addView(createFuncItem(R.drawable.ic_speed, speedLabel,
+        row3.addView(createFuncItem(R.drawable.ic_speed, speedLabel,
                 v -> onFuncPlaybackSpeed()));
-        contentLayout.addView(row2);
+        View spacer = new View(this);
+        spacer.setLayoutParams(new LinearLayout.LayoutParams(0, 0, 1f));
+        row3.addView(spacer);
+        contentLayout.addView(row3);
 
         scrollView.addView(contentLayout);
         overlayContainer.addView(scrollView);
@@ -1130,7 +1143,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
             return;
         }
         Toast.makeText(this, "开始下载...", Toast.LENGTH_SHORT).show();
-        String cookie = playerManager.getCookie();
+        String cookie = getDownloadCookieForSong(song);
         DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
             @Override
             public void onSuccess(String filePath) {
@@ -2012,7 +2025,7 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
         if (mp3Path == null) {
             // Download first, then show clip selection
             Toast.makeText(this, "正在下载歌曲...", Toast.LENGTH_SHORT).show();
-            String cookie = playerManager.getCookie();
+            String cookie = getDownloadCookieForSong(song);
             DownloadManager.downloadSong(song, cookie, new DownloadManager.DownloadCallback() {
                 @Override
                 public void onSuccess(String filePath) {
@@ -2030,6 +2043,14 @@ public class MainActivity extends AppCompatActivity implements MusicPlayerManage
     }
 
     private MediaPlayer ringtonePreviewPlayer;
+
+    private String getDownloadCookieForSong(Song song) {
+        if (song != null && song.isBilibili()) {
+            SharedPreferences prefs = getSharedPreferences("music163_settings", MODE_PRIVATE);
+            return prefs.getString("bilibili_cookie", "");
+        }
+        return playerManager.getCookie();
+    }
 
     private void showRingtoneClipOverlay(File file, String songTitle) {
         // Get song duration

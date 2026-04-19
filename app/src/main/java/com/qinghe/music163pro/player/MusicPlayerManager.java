@@ -69,6 +69,8 @@ public class MusicPlayerManager {
     private final Random random = new Random();
     private long currentlyPlayingSongId = -1;
     private Context appContext;
+    private long bilibiliRetrySongId = -1;
+    private int bilibiliRetryCount = 0;
 
     // Playlist source tracking: set when playing from a playlist
     private long sourcePlaylistId = -1;
@@ -461,6 +463,8 @@ public class MusicPlayerManager {
      * Bilibili audio URLs are time-limited, so always fetch fresh.
      */
     private void playBilibiliSong(Song song) {
+        bilibiliRetrySongId = song.getId();
+        bilibiliRetryCount = 0;
         String bilibiliCookie = getBilibiliCookie();
         BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), bilibiliCookie,
                 new BilibiliApiHelper.AudioStreamCallback() {
@@ -468,7 +472,7 @@ public class MusicPlayerManager {
                     public void onResult(String audioUrl) {
                         song.setUrl(audioUrl);
                         currentlyPlayingSongId = song.getId();
-                        playWithHeaders(audioUrl);
+                        playWithHeaders(song, audioUrl, 0);
                     }
 
                     @Override
@@ -484,6 +488,10 @@ public class MusicPlayerManager {
      * Play audio with Bilibili-specific headers (Referer required).
      */
     private void playWithHeaders(String url) {
+        playWithHeaders(getCurrentSong(), url, 0);
+    }
+
+    private void playWithHeaders(Song song, String url, int resumePositionMs) {
         stop();
         mediaPlayer = new MediaPlayer();
         try {
@@ -503,15 +511,35 @@ public class MusicPlayerManager {
             mediaPlayer.setDataSource(appContext, android.net.Uri.parse(url), headers);
 
             mediaPlayer.setOnPreparedListener(mp -> {
+                if (resumePositionMs > 0) {
+                    try {
+                        mp.seekTo(resumePositionMs);
+                    } catch (Exception e) {
+                        Log.w(TAG, "Error seeking Bilibili retry position", e);
+                    }
+                }
                 mp.start();
                 applyPlaybackSpeed();
                 isPlaying = true;
+                if (song != null && song.isBilibili()) {
+                    bilibiliRetrySongId = song.getId();
+                }
                 notifyPlayStateChanged(true);
             });
             mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                 isPlaying = false;
                 notifyPlayStateChanged(false);
+                Song currentSong = getCurrentSong();
+                if (currentSong != null
+                        && currentSong.isBilibili()
+                        && currentSong.getId() == bilibiliRetrySongId
+                        && bilibiliRetryCount < 1) {
+                    bilibiliRetryCount++;
+                    currentSong.setUrl(null);
+                    retryBilibiliPlayback(currentSong, safeGetCurrentPosition(mp));
+                    return true;
+                }
                 if (callback != null) {
                     mainHandler.post(() -> callback.onError("B站播放错误: " + what));
                 }
@@ -522,6 +550,37 @@ public class MusicPlayerManager {
             if (callback != null) {
                 mainHandler.post(() -> callback.onError(e.getMessage()));
             }
+        }
+    }
+
+    private void retryBilibiliPlayback(Song song, int resumePositionMs) {
+        String bilibiliCookie = getBilibiliCookie();
+        BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), bilibiliCookie,
+                new BilibiliApiHelper.AudioStreamCallback() {
+                    @Override
+                    public void onResult(String audioUrl) {
+                        song.setUrl(audioUrl);
+                        currentlyPlayingSongId = song.getId();
+                        playWithHeaders(song, audioUrl, Math.max(resumePositionMs, 0));
+                    }
+
+                    @Override
+                    public void onError(String message) {
+                        if (callback != null) {
+                            mainHandler.post(() -> callback.onError("B站播放重连失败: " + message));
+                        }
+                    }
+                });
+    }
+
+    private int safeGetCurrentPosition(MediaPlayer player) {
+        if (player == null) {
+            return 0;
+        }
+        try {
+            return player.getCurrentPosition();
+        } catch (Exception e) {
+            return 0;
         }
     }
 
