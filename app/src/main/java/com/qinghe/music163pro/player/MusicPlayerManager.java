@@ -13,6 +13,7 @@ import android.util.Log;
 
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
+import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.Song;
 
 import org.json.JSONArray;
@@ -71,6 +72,11 @@ public class MusicPlayerManager {
     private Context appContext;
     private long bilibiliRetrySongId = -1;
     private int bilibiliRetryCount = 0;
+
+    // Bilibili CDN URL pre-refresh timer (URLs expire after ~30 min)
+    private static final long BILIBILI_REFRESH_INTERVAL_MS = 25 * 60 * 1000; // 25 minutes
+    private Runnable bilibiliRefreshRunnable;
+    private String prefetchedBilibiliUrl;
 
     // Playlist source tracking: set when playing from a playlist
     private long sourcePlaylistId = -1;
@@ -237,6 +243,7 @@ public class MusicPlayerManager {
 
     public void play(String url) {
         stop();
+        cancelBilibiliRefreshTimer();
         mediaPlayer = new MediaPlayer();
         try {
             if (appContext != null) {
@@ -299,6 +306,48 @@ public class MusicPlayerManager {
         }
     }
 
+    /**
+     * Play a local file directly. Unlike play(), the error handler doesn't
+     * try to fetch a URL from NetEase API, preventing unnecessary API calls
+     * for downloaded songs (including Bilibili downloads).
+     */
+    private void playLocalFile(String localPath, Song song) {
+        stop();
+        cancelBilibiliRefreshTimer();
+        mediaPlayer = new MediaPlayer();
+        try {
+            if (appContext != null) {
+                mediaPlayer.setWakeMode(appContext, PowerManager.PARTIAL_WAKE_LOCK);
+            }
+            mediaPlayer.setAudioAttributes(
+                    new AudioAttributes.Builder()
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .build());
+            mediaPlayer.setDataSource(localPath);
+            mediaPlayer.setOnPreparedListener(mp -> {
+                mp.start();
+                applyPlaybackSpeed();
+                isPlaying = true;
+                notifyPlayStateChanged(true);
+            });
+            mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
+            mediaPlayer.setOnErrorListener((mp, what, extra) -> {
+                isPlaying = false;
+                notifyPlayStateChanged(false);
+                if (callback != null) {
+                    mainHandler.post(() -> callback.onError("本地文件播放错误: " + what));
+                }
+                return true;
+            });
+            mediaPlayer.prepareAsync();
+        } catch (Exception e) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onError(e.getMessage()));
+            }
+        }
+    }
+
     public void pause() {
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
             mediaPlayer.pause();
@@ -316,6 +365,7 @@ public class MusicPlayerManager {
     }
 
     public void stop() {
+        cancelBilibiliRefreshTimer();
         if (mediaPlayer != null) {
             try {
                 if (mediaPlayer.isPlaying()) {
@@ -423,12 +473,27 @@ public class MusicPlayerManager {
         // This covers both legacy (id=0) and new format (real id with local path).
         String url = song.getUrl();
         if (url != null && !url.isEmpty() && url.startsWith("/")) {
+            // Verify local file still exists before playing
+            if (new java.io.File(url).exists()) {
+                currentlyPlayingSongId = song.getId();
+                playLocalFile(url, song);
+                return;
+            } else {
+                song.setUrl(null);
+            }
+        }
+
+        // Check if the song is downloaded locally (even if URL wasn't pre-set).
+        // This avoids API calls for downloaded songs after app restart.
+        String localPath = DownloadManager.getDownloadedMp3Path(song);
+        if (localPath != null) {
+            song.setUrl(localPath);
             currentlyPlayingSongId = song.getId();
-            play(url);
+            playLocalFile(localPath, song);
             return;
         }
 
-        // Handle Bilibili songs
+        // Handle Bilibili songs (stream from network)
         if (song.isBilibili()) {
             playBilibiliSong(song);
             return;
@@ -493,6 +558,8 @@ public class MusicPlayerManager {
 
     private void playWithHeaders(Song song, String url, int resumePositionMs) {
         stop();
+        cancelBilibiliRefreshTimer();
+        prefetchedBilibiliUrl = null;
         mediaPlayer = new MediaPlayer();
         try {
             if (appContext != null) {
@@ -523,27 +590,68 @@ public class MusicPlayerManager {
                 isPlaying = true;
                 if (song != null && song.isBilibili()) {
                     bilibiliRetrySongId = song.getId();
+                    // Start periodic URL refresh timer
+                    startBilibiliRefreshTimer(song);
                 }
                 notifyPlayStateChanged(true);
             });
-            mediaPlayer.setOnCompletionListener(mp -> onSongCompleted());
+            mediaPlayer.setOnCompletionListener(mp -> {
+                cancelBilibiliRefreshTimer();
+                onSongCompleted();
+            });
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
                 isPlaying = false;
                 notifyPlayStateChanged(false);
+                cancelBilibiliRefreshTimer();
                 Song currentSong = getCurrentSong();
+                // Allow up to 3 retries for Bilibili CDN URL expiration
                 if (currentSong != null
                         && currentSong.isBilibili()
                         && currentSong.getId() == bilibiliRetrySongId
-                        && bilibiliRetryCount < 1) {
+                        && bilibiliRetryCount < 3) {
                     bilibiliRetryCount++;
-                    currentSong.setUrl(null);
-                    retryBilibiliPlayback(currentSong, safeGetCurrentPosition(mp));
+                    int pos = safeGetCurrentPosition(mp);
+                    // Use prefetched URL if available (faster recovery)
+                    if (prefetchedBilibiliUrl != null) {
+                        String freshUrl = prefetchedBilibiliUrl;
+                        prefetchedBilibiliUrl = null;
+                        currentSong.setUrl(freshUrl);
+                        currentlyPlayingSongId = currentSong.getId();
+                        playWithHeaders(currentSong, freshUrl, Math.max(pos, 0));
+                    } else {
+                        currentSong.setUrl(null);
+                        retryBilibiliPlayback(currentSong, pos);
+                    }
                     return true;
                 }
                 if (callback != null) {
                     mainHandler.post(() -> callback.onError("B站播放错误: " + what));
                 }
                 return true;
+            });
+            // Monitor buffering stalls for proactive URL refresh
+            mediaPlayer.setOnInfoListener((mp, what, extra) -> {
+                if (what == MediaPlayer.MEDIA_INFO_BUFFERING_START) {
+                    Log.d(TAG, "Bilibili buffering started");
+                    // If we have a prefetched URL and playback is stalling,
+                    // seamlessly switch to the new URL
+                    Song currentSong = getCurrentSong();
+                    if (currentSong != null && currentSong.isBilibili()
+                            && prefetchedBilibiliUrl != null) {
+                        int pos = safeGetCurrentPosition(mp);
+                        if (pos > 60000) { // Only if played >1 min
+                            String freshUrl = prefetchedBilibiliUrl;
+                            prefetchedBilibiliUrl = null;
+                            bilibiliRetryCount = 0;
+                            Log.d(TAG, "Proactive Bilibili URL switch at position " + pos);
+                            currentSong.setUrl(freshUrl);
+                            currentlyPlayingSongId = currentSong.getId();
+                            playWithHeaders(currentSong, freshUrl, pos);
+                            return true;
+                        }
+                    }
+                }
+                return false;
             });
             mediaPlayer.prepareAsync();
         } catch (Exception e) {
@@ -581,6 +689,77 @@ public class MusicPlayerManager {
             return player.getCurrentPosition();
         } catch (Exception e) {
             return 0;
+        }
+    }
+
+    /**
+     * Start a periodic timer that pre-fetches a fresh Bilibili audio URL
+     * before the current one expires (~30 min CDN limit).
+     * The prefetched URL is stored and used for seamless recovery.
+     */
+    private void startBilibiliRefreshTimer(Song song) {
+        cancelBilibiliRefreshTimer();
+        bilibiliRefreshRunnable = new Runnable() {
+            @Override
+            public void run() {
+                Song currentSong = getCurrentSong();
+                if (currentSong == null || !currentSong.isBilibili()
+                        || currentSong.getId() != song.getId()) {
+                    return;
+                }
+                Log.d(TAG, "Bilibili URL pre-refresh timer fired");
+                String cookie = getBilibiliCookie();
+                BilibiliApiHelper.getAudioStreamUrl(
+                        currentSong.getBvid(), currentSong.getCid(), cookie,
+                        new BilibiliApiHelper.AudioStreamCallback() {
+                            @Override
+                            public void onResult(String audioUrl) {
+                                prefetchedBilibiliUrl = audioUrl;
+                                Log.d(TAG, "Bilibili URL pre-fetched successfully");
+                                // Schedule proactive switch after 3 minutes if not used
+                                mainHandler.postDelayed(() -> {
+                                    Song cs = getCurrentSong();
+                                    if (cs != null && cs.isBilibili()
+                                            && cs.getId() == song.getId()
+                                            && prefetchedBilibiliUrl != null
+                                            && isPlaying && mediaPlayer != null) {
+                                        int pos = safeGetCurrentPosition(mediaPlayer);
+                                        if (pos > 60000) {
+                                            String freshUrl = prefetchedBilibiliUrl;
+                                            prefetchedBilibiliUrl = null;
+                                            bilibiliRetryCount = 0;
+                                            Log.d(TAG, "Proactive Bilibili URL switch at " + pos + "ms");
+                                            cs.setUrl(freshUrl);
+                                            currentlyPlayingSongId = cs.getId();
+                                            playWithHeaders(cs, freshUrl, pos);
+                                        }
+                                    }
+                                }, 3 * 60 * 1000);
+                                // Re-schedule for next refresh cycle
+                                mainHandler.postDelayed(bilibiliRefreshRunnable,
+                                        BILIBILI_REFRESH_INTERVAL_MS);
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                Log.w(TAG, "Bilibili URL pre-refresh failed: " + message);
+                                // Retry after 5 minutes
+                                mainHandler.postDelayed(bilibiliRefreshRunnable,
+                                        5 * 60 * 1000);
+                            }
+                        });
+            }
+        };
+        mainHandler.postDelayed(bilibiliRefreshRunnable, BILIBILI_REFRESH_INTERVAL_MS);
+    }
+
+    /**
+     * Cancel the Bilibili URL refresh timer.
+     */
+    private void cancelBilibiliRefreshTimer() {
+        if (bilibiliRefreshRunnable != null) {
+            mainHandler.removeCallbacks(bilibiliRefreshRunnable);
+            bilibiliRefreshRunnable = null;
         }
     }
 
