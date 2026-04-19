@@ -19,6 +19,7 @@ import com.qinghe.music163pro.model.Song;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -474,7 +475,7 @@ public class MusicPlayerManager {
         String url = song.getUrl();
         if (url != null && !url.isEmpty() && url.startsWith("/")) {
             // Verify local file still exists before playing
-            if (new java.io.File(url).exists()) {
+            if (new File(url).exists()) {
                 currentlyPlayingSongId = song.getId();
                 playLocalFile(url, song);
                 return;
