@@ -9,7 +9,7 @@ android {
 
     defaultConfig {
         applicationId "com.qinghe.music163pro"
-        minSdk 23
+        minSdk 21
         targetSdk 27 
         versionCode 29
         versionName "20260418-2"

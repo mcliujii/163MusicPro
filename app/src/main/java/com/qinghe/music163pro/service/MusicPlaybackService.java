@@ -103,9 +103,12 @@ public class MusicPlaybackService extends Service {
         // Content intent: tap notification to open player
         Intent contentIntent = new Intent(this, MainActivity.class);
         contentIntent.setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int contentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            contentFlags |= PendingIntent.FLAG_IMMUTABLE;
+        }
         PendingIntent contentPendingIntent = PendingIntent.getActivity(
-                this, 0, contentIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                this, 0, contentIntent, contentFlags);
 
         // Action intents
         PendingIntent prevPendingIntent = createActionPendingIntent(ACTION_PREVIOUS, 1);
@@ -149,9 +152,12 @@ public class MusicPlaybackService extends Service {
     private PendingIntent createActionPendingIntent(String action, int requestCode) {
         Intent intent = new Intent(this, MusicPlaybackService.class);
         intent.setAction(action);
+        int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            flags |= PendingIntent.FLAG_IMMUTABLE;
+        }
         return PendingIntent.getService(
-                this, requestCode, intent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+                this, requestCode, intent, flags);
     }
 
     private void acquireWakeLock() {
