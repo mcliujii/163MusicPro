@@ -9,6 +9,7 @@ import android.util.Log;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.AudioTranscoder;
 
 import org.json.JSONObject;
 
@@ -35,6 +36,7 @@ public class DownloadManager {
     private static final String DOWNLOAD_DIR = "163Music/Download";
     private static final String INFO_FILE = "info.json";
     private static final String SONG_FILE = "song.mp3";
+    private static final String TEMP_FILE = "song.tmp";
     private static final String LYRICS_FILE = "lyrics.lrc";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -43,6 +45,14 @@ public class DownloadManager {
         void onSuccess(String filePath);
         void onError(String message);
     }
+
+    public interface BatchDownloadCallback {
+        void onProgress(int current, int total, String songName);
+        void onAllComplete(int successCount, int skipCount, int failCount);
+        void onSingleError(String songName, String message);
+    }
+
+    private static volatile boolean batchCancelled = false;
 
     /**
      * Download a song to /sdcard/163Music/Download/<folder>/
@@ -95,7 +105,10 @@ public class DownloadManager {
                 }
             }
 
-            File outputFile = new File(songDir, SONG_FILE);
+            // For Bilibili, download to temp file first for transcoding
+            File tempFile = bilibili ? new File(songDir, TEMP_FILE) : null;
+            File outputFile = bilibili ? new File(songDir, SONG_FILE) : new File(songDir, SONG_FILE);
+            File downloadTarget = (bilibili && tempFile != null) ? tempFile : outputFile;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -108,7 +121,7 @@ public class DownloadManager {
 
             try {
                 InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(outputFile);
+                FileOutputStream fos = new FileOutputStream(downloadTarget);
                 byte[] buffer = new byte[8192];
                 int len;
                 while ((len = is.read(buffer)) != -1) {
@@ -117,6 +130,29 @@ public class DownloadManager {
                 fos.flush();
                 fos.close();
                 is.close();
+
+                // For Bilibili: transcode to proper MP3 if needed
+                if (bilibili && tempFile != null) {
+                    Log.i(TAG, "Bilibili download complete, checking format...");
+                    String format = AudioTranscoder.guessAudioFormat(tempFile.getAbsolutePath());
+                    Log.i(TAG, "Detected format: " + format);
+                    if (AudioTranscoder.isLikelyMp3(tempFile.getAbsolutePath())) {
+                        // Already MP3, just rename
+                        tempFile.renameTo(outputFile);
+                        Log.i(TAG, "Already MP3, renamed directly");
+                    } else {
+                        // Transcode to MP3
+                        Log.i(TAG, "Transcoding " + format + " to MP3...");
+                        boolean ok = AudioTranscoder.transcodeToMp3Sync(
+                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+                        if (!ok) {
+                            // Transcode failed, rename as fallback
+                            Log.w(TAG, "Transcode failed, renaming as fallback");
+                            tempFile.renameTo(outputFile);
+                        }
+                        // transcodeToMp3Sync deletes input file on success
+                    }
+                }
 
                 // Save song info JSON
                 saveSongInfo(songDir, song);
@@ -236,6 +272,215 @@ public class DownloadManager {
         } catch (Exception e) {
             Log.w(TAG, "Error loading song info from " + songDir, e);
             return null;
+        }
+    }
+
+    /**
+     * Download a list of songs sequentially, skipping already-downloaded ones.
+     * Runs on a background thread; all callbacks are posted to the main thread.
+     * @param songs list of songs to download
+     * @param cookie authentication cookie (NetEase or Bilibili)
+     * @param callback batch progress and completion callback
+     */
+    public static void batchDownloadSongs(List<Song> songs, String cookie, BatchDownloadCallback callback) {
+        if (songs == null || songs.isEmpty()) {
+            if (callback != null) {
+                mainHandler.post(() -> callback.onAllComplete(0, 0, 0));
+            }
+            return;
+        }
+        batchCancelled = false;
+        executor.execute(() -> {
+            int successCount = 0;
+            int skipCount = 0;
+            int failCount = 0;
+            int total = songs.size();
+
+            for (int i = 0; i < total; i++) {
+                if (batchCancelled) break;
+
+                Song song = songs.get(i);
+                String displayName = song.getName();
+                mainHandler.post(() -> {
+                    if (callback != null) callback.onProgress(i + 1, total, displayName);
+                });
+
+                // Skip already downloaded
+                if (isDownloaded(song)) {
+                    skipCount++;
+                    continue;
+                }
+
+                // Use a synchronous wrapper for each song download
+                boolean ok = downloadSingleSongSync(song, cookie);
+                if (ok) {
+                    successCount++;
+                } else {
+                    failCount++;
+                    mainHandler.post(() -> {
+                        if (callback != null) callback.onSingleError(displayName, "下载失败");
+                    });
+                }
+            }
+
+            final int s = successCount, sk = skipCount, f = failCount;
+            mainHandler.post(() -> {
+                if (callback != null) callback.onAllComplete(s, sk, f);
+            });
+        });
+    }
+
+    /**
+     * Cancel the current batch download.
+     */
+    public static void cancelBatchDownload() {
+        batchCancelled = true;
+    }
+
+    /**
+     * Check if a batch download is in progress.
+     */
+    public static boolean isBatchDownloading() {
+        return batchCancelled; // reuse flag: while batch is active, this is false; after cancel set true
+    }
+
+    /**
+     * Synchronous single-song download (blocks caller thread).
+     * Used internally by batchDownloadSongs.
+     * Returns true on success, false on failure.
+     */
+    private static boolean downloadSingleSongSync(Song song, String cookie) {
+        try {
+            if (batchCancelled) return false;
+            if (song.isBilibili()) {
+                // Synchronous Bilibili URL fetch
+                String[] result = new String[1];
+                Exception[] error = new Exception[1];
+                java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), cookie,
+                        new BilibiliApiHelper.AudioStreamCallback() {
+                            @Override
+                            public void onResult(String url) {
+                                result[0] = url;
+                                latch.countDown();
+                            }
+
+                            @Override
+                            public void onError(String message) {
+                                error[0] = new Exception(message);
+                                latch.countDown();
+                            }
+                        });
+                latch.await(15, java.util.concurrent.TimeUnit.SECONDS);
+                if (batchCancelled) return false;
+                if (result[0] == null) return false;
+                return doDownloadSync(song, result[0], true);
+            }
+
+            // NetEase: synchronous URL fetch
+            String[] urlResult = new String[1];
+            Exception[] urlError = new Exception[1];
+            java.util.concurrent.CountDownLatch urlLatch = new java.util.concurrent.CountDownLatch(1);
+            MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
+                @Override
+                public void onResult(String url) {
+                    urlResult[0] = url;
+                    urlLatch.countDown();
+                }
+
+                @Override
+                public void onError(String message) {
+                    urlError[0] = new Exception(message);
+                    urlLatch.countDown();
+                }
+            });
+            urlLatch.await(15, java.util.concurrent.TimeUnit.SECONDS);
+            if (batchCancelled) return false;
+            if (urlResult[0] == null) return false;
+            return doDownloadSync(song, urlResult[0], false);
+        } catch (Exception e) {
+            Log.w(TAG, "Sync download error for " + song.getName(), e);
+            return false;
+        }
+    }
+
+    /**
+     * Synchronous file download (blocks caller thread).
+     * Returns true on success.
+     */
+    private static boolean doDownloadSync(Song song, String urlStr, boolean bilibili) {
+        try {
+            File songDir = getSongDir(song);
+            if (!songDir.exists()) {
+                if (!songDir.mkdirs()) return false;
+            }
+
+            // For Bilibili, download to temp file first for transcoding
+            File tempFile = bilibili ? new File(songDir, TEMP_FILE) : null;
+            File outputFile = new File(songDir, SONG_FILE);
+            File downloadTarget = (bilibili && tempFile != null) ? tempFile : outputFile;
+
+            URL url = new URL(urlStr);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(60000);
+            conn.setRequestProperty("User-Agent", "Mozilla/5.0");
+            if (bilibili) {
+                conn.setRequestProperty("Referer", "https://www.bilibili.com");
+            }
+
+            try {
+                InputStream is = conn.getInputStream();
+                FileOutputStream fos = new FileOutputStream(downloadTarget);
+                byte[] buffer = new byte[8192];
+                int len;
+                while ((len = is.read(buffer)) != -1) {
+                    if (batchCancelled) {
+                        fos.close();
+                        is.close();
+                        downloadTarget.delete();
+                        return false;
+                    }
+                    fos.write(buffer, 0, len);
+                }
+                fos.flush();
+                fos.close();
+                is.close();
+
+                // For Bilibili: transcode to proper MP3 if needed
+                if (bilibili && tempFile != null) {
+                    if (batchCancelled) {
+                        tempFile.delete();
+                        return false;
+                    }
+                    Log.i(TAG, "Bilibili download complete, checking format...");
+                    String format = AudioTranscoder.guessAudioFormat(tempFile.getAbsolutePath());
+                    Log.i(TAG, "Detected format: " + format);
+                    if (AudioTranscoder.isLikelyMp3(tempFile.getAbsolutePath())) {
+                        tempFile.renameTo(outputFile);
+                        Log.i(TAG, "Already MP3, renamed directly");
+                    } else {
+                        Log.i(TAG, "Transcoding " + format + " to MP3...");
+                        boolean ok = AudioTranscoder.transcodeToMp3Sync(
+                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+                        if (!ok) {
+                            Log.w(TAG, "Transcode failed, renaming as fallback");
+                            tempFile.renameTo(outputFile);
+                        }
+                    }
+                }
+
+                saveSongInfo(songDir, song);
+                if (!bilibili) {
+                    downloadLyrics(songDir, song);
+                }
+                return true;
+            } finally {
+                conn.disconnect();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Download error for " + song.getName(), e);
+            return false;
         }
     }
 
