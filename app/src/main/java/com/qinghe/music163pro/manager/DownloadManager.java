@@ -300,9 +300,10 @@ public class DownloadManager {
                 if (batchCancelled) break;
 
                 Song song = songs.get(i);
-                String displayName = song.getName();
+                final String displayName = song.getName();
+                final int progress = i + 1;
                 mainHandler.post(() -> {
-                    if (callback != null) callback.onProgress(i + 1, total, displayName);
+                    if (callback != null) callback.onProgress(progress, total, displayName);
                 });
 
                 // Skip already downloaded
