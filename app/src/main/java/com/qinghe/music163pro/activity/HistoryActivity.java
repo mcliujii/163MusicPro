@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -17,6 +18,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.manager.HistoryManager;
@@ -47,6 +49,11 @@ public class HistoryActivity extends BaseWatchActivity {
     // Multi-select mode fields
     private final Set<Integer> selectedPositions = new HashSet<>();
     private boolean isSelectMode = false;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private LinearLayout selectBar;
 
     @Override

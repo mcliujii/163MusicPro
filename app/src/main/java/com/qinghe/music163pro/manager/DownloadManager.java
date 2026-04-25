@@ -285,34 +285,26 @@ public class DownloadManager {
                 fos.close();
                 is.close();
 
-                // For Bilibili: transcode MP4 audio to proper M4A/AAC
+                // For Bilibili: ALWAYS transcode to extract audio-only (skip needsTranscoding check)
                 if (bilibili && tempFile.exists()) {
-                    boolean needsTranscode = AudioTranscoder.needsTranscoding(tempFile.getAbsolutePath());
-                    if (needsTranscode) {
-                        Log.i(TAG, "Bilibili audio needs transcoding: " + tempFile.getAbsolutePath());
-                        progress.status = "transcoding";
-                        progress.percent = -1; // indeterminate
-                        notifyProgressChanged();
+                    Log.i(TAG, "Bilibili download, force transcoding: " + song.getName());
+                    progress.status = "transcoding";
+                    progress.percent = -1; // indeterminate
+                    notifyProgressChanged();
 
-                        boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
-                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+                    boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
+                            tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
 
-                        if (transcodeOk) {
-                            // Transcode success, delete temp file
-                            tempFile.delete();
-                            Log.i(TAG, "Bilibili audio transcoded successfully: " + song.getName());
-                        } else {
-                            // Transcode failed, rename temp as fallback
-                            Log.w(TAG, "Bilibili transcode failed, keeping original for " + song.getName());
-                            if (!outputFile.exists()) {
-                                tempFile.renameTo(outputFile);
-                            } else {
-                                tempFile.delete();
-                            }
-                        }
+                    if (transcodeOk) {
+                        tempFile.delete();
+                        Log.i(TAG, "Bilibili audio transcoded successfully: " + song.getName());
                     } else {
-                        // Already playable format, just rename
-                        tempFile.renameTo(outputFile);
+                        Log.w(TAG, "Bilibili transcode failed, keeping original for " + song.getName());
+                        if (!outputFile.exists()) {
+                            tempFile.renameTo(outputFile);
+                        } else {
+                            tempFile.delete();
+                        }
                     }
                 }
 
@@ -705,32 +697,26 @@ public class DownloadManager {
                 fos.close();
                 is.close();
 
-                // For Bilibili: transcode MP4 audio to proper M4A/AAC
+                // For Bilibili: ALWAYS transcode to extract audio-only (skip needsTranscoding check)
                 if (bilibili && tempFile != null && tempFile.exists()) {
-                    boolean needsTranscode = AudioTranscoder.needsTranscoding(tempFile.getAbsolutePath());
-                    if (needsTranscode) {
-                        Log.i(TAG, "Bilibili audio needs transcoding: " + song.getName());
-                        progress.status = "transcoding";
-                        progress.percent = -1;
-                        notifyProgressChanged();
+                    Log.i(TAG, "Bilibili download, force transcoding: " + song.getName());
+                    progress.status = "transcoding";
+                    progress.percent = -1;
+                    notifyProgressChanged();
 
-                        boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
-                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+                    boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
+                            tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
 
-                        if (transcodeOk) {
-                            tempFile.delete();
-                            Log.i(TAG, "Bilibili audio transcoded: " + song.getName());
-                        } else {
-                            Log.w(TAG, "Bilibili transcode failed, keeping original: " + song.getName());
-                            if (!outputFile.exists()) {
-                                tempFile.renameTo(outputFile);
-                            } else {
-                                tempFile.delete();
-                            }
-                        }
+                    if (transcodeOk) {
+                        tempFile.delete();
+                        Log.i(TAG, "Bilibili audio transcoded: " + song.getName());
                     } else {
-                        // Already playable, just rename
-                        tempFile.renameTo(outputFile);
+                        Log.w(TAG, "Bilibili transcode failed, keeping original: " + song.getName());
+                        if (!outputFile.exists()) {
+                            tempFile.renameTo(outputFile);
+                        } else {
+                            tempFile.delete();
+                        }
                     }
                 }
 

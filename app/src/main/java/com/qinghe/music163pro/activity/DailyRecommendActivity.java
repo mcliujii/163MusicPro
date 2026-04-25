@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -12,6 +13,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.manager.DownloadManager;
@@ -39,6 +41,11 @@ public class DailyRecommendActivity extends BaseWatchActivity {
     // Multi-select fields
     private final Set<Integer> selectedPositions = new HashSet<>();
     private boolean isSelectMode = false;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private LinearLayout selectBar;
 
     @Override

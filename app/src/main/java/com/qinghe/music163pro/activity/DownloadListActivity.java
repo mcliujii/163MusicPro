@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Handler;
@@ -14,6 +15,7 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.manager.DownloadManager;
@@ -66,6 +68,11 @@ public class DownloadListActivity extends BaseWatchActivity {
         public void onDownloadRemoved(String songKey) {
             // Will be handled in onProgressChanged with removal
         }
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     };
 
     @Override

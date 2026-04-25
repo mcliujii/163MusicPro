@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -11,6 +12,7 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.manager.BilibiliFavoritesManager;
 import com.qinghe.music163pro.model.BilibiliFavorite;
@@ -21,6 +23,11 @@ public class BilibiliFavoritesActivity extends BaseWatchActivity {
 
     private BilibiliFavoritesManager favoritesManager;
     private LinearLayout listContainer;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private TextView emptyView;
 
     @Override

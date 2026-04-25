@@ -1,6 +1,7 @@
 package com.qinghe.music163pro.activity;
 
 import android.app.AlertDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -18,6 +19,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.PlaylistInfo;
@@ -38,6 +40,11 @@ public class MyPlaylistsActivity extends AppCompatActivity {
     private final List<PlaylistInfo> displayList = new ArrayList<>();
     private ArrayAdapter<PlaylistInfo> adapter;
     private TextView tvStatus;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private long currentUserId = -1;
 
     @Override

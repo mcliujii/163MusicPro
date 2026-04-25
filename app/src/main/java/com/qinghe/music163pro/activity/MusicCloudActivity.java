@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
 import android.os.Environment;
@@ -11,6 +12,7 @@ import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.CloudItem;
@@ -35,6 +37,11 @@ public class MusicCloudActivity extends BaseWatchActivity {
     private final List<CloudItem> displayItems = new ArrayList<>();
 
     private ArrayAdapter<CloudItem> adapter;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private TextView tvStatus;
 
     @Override

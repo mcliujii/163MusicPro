@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -13,6 +14,7 @@ import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 
@@ -24,6 +26,11 @@ public class BilibiliCloudFavoritesActivity extends BaseWatchActivity {
     private TextView tvStatus;
     private TextView tvEmpty;
     private LinearLayout listContainer;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private final List<BilibiliApiHelper.BilibiliFavoriteFolder> folders = new ArrayList<>();
 
     @Override

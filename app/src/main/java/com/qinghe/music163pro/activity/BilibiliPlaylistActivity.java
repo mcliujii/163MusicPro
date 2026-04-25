@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -14,6 +15,7 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.manager.BilibiliFavoritesManager;
@@ -47,6 +49,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
     // Multi-select state
     private final Set<Integer> selectedPositions = new HashSet<>();
     private boolean isSelectMode = false;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private boolean isBatchDownloading = false;
 
     @Override

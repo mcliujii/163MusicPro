@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Gravity;
@@ -8,6 +9,7 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.MoreMenuPreferences;
 import com.qinghe.music163pro.util.WatchUiUtils;
@@ -19,6 +21,11 @@ import java.util.Map;
  * Edit visible entries for the more screen.
  */
 public class EditMoreActivity extends BaseWatchActivity {
+
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
 
     private final Map<String, String> itemLabels = new LinkedHashMap<>();
 

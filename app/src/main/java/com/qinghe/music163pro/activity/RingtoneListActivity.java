@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -16,6 +17,7 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.manager.RingtoneManagerHelper;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
@@ -33,6 +35,11 @@ public class RingtoneListActivity extends BaseWatchActivity {
     private ArrayAdapter<RingtoneManagerHelper.RingtoneInfo> adapter;
     private RingtoneManagerHelper ringtoneManager;
     private ListView lvRingtones;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private TextView tvEmpty;
 
     @Override

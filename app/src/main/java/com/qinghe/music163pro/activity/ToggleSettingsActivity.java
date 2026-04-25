@@ -1,5 +1,6 @@
 package com.qinghe.music163pro.activity;
 
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.WindowManager;
@@ -10,6 +11,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 
@@ -33,6 +35,11 @@ public class ToggleSettingsActivity extends AppCompatActivity {
     private SharedPreferences prefs;
 
     /** Suppress listener callbacks while programmatically setting switch state. */
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private boolean updatingSwitch = false;
 
     @Override

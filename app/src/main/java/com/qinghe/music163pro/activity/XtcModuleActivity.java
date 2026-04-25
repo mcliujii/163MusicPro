@@ -1,6 +1,7 @@
 package com.qinghe.music163pro.activity;
 
 import android.Manifest;
+import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
@@ -17,6 +18,7 @@ import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
 import com.google.android.material.button.MaterialButton;
+import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.UpdateChecker;
 
@@ -33,6 +35,11 @@ public class XtcModuleActivity extends BaseWatchActivity {
     private MaterialButton btnDownload;
     private ProgressBar progressBar;
     private TextView tvStatus;
+    @Override
+    protected void attachBaseContext(Context newBase) {
+        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
+    }
+
     private boolean downloading;
 
     @Override
