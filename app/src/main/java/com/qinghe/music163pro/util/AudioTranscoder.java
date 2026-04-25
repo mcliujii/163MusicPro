@@ -407,16 +407,52 @@ public class AudioTranscoder {
     }
 
     /**
-     * Check if a file needs transcoding (i.e., is NOT a standard MP3/M4A/AAC file
-     * that ExoPlayer can already play directly).
+     * Check if a file needs transcoding.
+     * For MP4/M4A containers, also checks whether it contains video tracks.
+     * If it has a video track, it MUST be transcoded to extract audio only.
      */
     public static boolean needsTranscoding(String filePath) {
         String format = guessAudioFormat(filePath);
-        // These formats are already playable by ExoPlayer directly
-        if (format.equals("mp3") || format.equals("m4a/aac")) {
+        // MP3 is always fine, no transcoding needed
+        if (format.equals("mp3")) {
             return false;
         }
+        // For MP4/M4A containers, check if there's a video track
+        if (format.equals("m4a/aac")) {
+            return containsVideoTrack(filePath);
+        }
+        // All other formats (webm, flac, ogg, m4s fragment, etc.) need transcoding
         return true;
+    }
+
+    /**
+     * Check if an MP4/M4A file contains any video tracks.
+     * Returns true if video track found, false if audio-only or on error.
+     */
+    private static boolean containsVideoTrack(String filePath) {
+        MediaExtractor extractor = null;
+        try {
+            extractor = new MediaExtractor();
+            extractor.setDataSource(filePath);
+            int trackCount = extractor.getTrackCount();
+            for (int i = 0; i < trackCount; i++) {
+                MediaFormat fmt = extractor.getTrackFormat(i);
+                String mime = fmt.getString(MediaFormat.KEY_MIME);
+                if (mime != null && mime.startsWith("video/")) {
+                    Log.i(TAG, "File contains video track: " + mime + " — needs transcoding");
+                    return true;
+                }
+            }
+            Log.i(TAG, "File is audio-only MP4/M4A — no transcoding needed");
+            return false;
+        } catch (Exception e) {
+            Log.w(TAG, "Error checking tracks, will transcode to be safe", e);
+            return true; // If we can't determine, transcode to be safe
+        } finally {
+            if (extractor != null) {
+                try { extractor.release(); } catch (Exception ignored) {}
+            }
+        }
     }
 
     /**
