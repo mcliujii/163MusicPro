@@ -48,11 +48,11 @@ public class TopListActivity extends AppCompatActivity {
             this.name = name;
             this.updateFrequency = updateFrequency;
         }
+    }
+
     @Override
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     }
 
     @Override

@@ -57,11 +57,11 @@ public class LyricsActivity extends AppCompatActivity {
             this.timeMs = timeMs;
             this.text = text;
         }
+    }
+
     @Override
     protected void attachBaseContext(Context newBase) {
         super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     }
 
     @Override

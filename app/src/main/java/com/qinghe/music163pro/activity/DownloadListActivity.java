@@ -68,11 +68,6 @@ public class DownloadListActivity extends BaseWatchActivity {
         public void onDownloadRemoved(String songKey) {
             // Will be handled in onProgressChanged with removal
         }
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     };
 
     @Override
