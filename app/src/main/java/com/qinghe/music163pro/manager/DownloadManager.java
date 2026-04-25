@@ -9,6 +9,7 @@ import android.util.Log;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
+import com.qinghe.music163pro.util.AudioTranscoder;
 
 import org.json.JSONObject;
 
@@ -21,7 +22,10 @@ import java.io.OutputStreamWriter;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -39,6 +43,68 @@ public class DownloadManager {
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
+    /** Progress info for an active download task. */
+    public static class DownloadProgress {
+        public final Song song;
+        public long downloadedBytes;
+        public long totalBytes;
+        public int percent;
+        public String status; // "downloading", "transcoding", "complete", "error"
+        public String errorMsg;
+        public long startTime;
+        public long lastUpdateTime;
+        public long lastDownloadedBytes;
+        public int speedBytesPerSec;
+
+        public DownloadProgress(Song song) {
+            this.song = song;
+            this.status = "downloading";
+            this.startTime = System.currentTimeMillis();
+            this.lastUpdateTime = this.startTime;
+        }
+
+        public String getFormattedSize() {
+            return formatFileSize(downloadedBytes);
+        }
+
+        public String getTotalFormattedSize() {
+            return formatFileSize(totalBytes);
+        }
+
+        public String getSpeedText() {
+            if (status.equals("complete") || status.equals("error")) return "";
+            return formatFileSize(speedBytesPerSec) + "/s";
+        }
+
+        private String formatFileSize(long bytes) {
+            if (bytes < 1024) return bytes + "B";
+            if (bytes < 1024 * 1024) return String.format("%.1fKB", bytes / 1024.0);
+            return String.format("%.1fMB", bytes / (1024.0 * 1024.0));
+        }
+
+        public void updateSpeed() {
+            long now = System.currentTimeMillis();
+            long elapsed = now - lastUpdateTime;
+            if (elapsed >= 500) {
+                long deltaBytes = downloadedBytes - lastDownloadedBytes;
+                speedBytesPerSec = (int) (deltaBytes * 1000 / elapsed);
+                lastUpdateTime = now;
+                lastDownloadedBytes = downloadedBytes;
+            }
+        }
+    }
+
+    /** Listener for download progress changes (called on main thread). */
+    public interface OnDownloadProgressListener {
+        void onProgressChanged(Map<String, DownloadProgress> activeDownloads);
+        void onDownloadAdded(DownloadProgress progress);
+        void onDownloadRemoved(String songKey);
+    }
+
+    private static final CopyOnWriteArrayList<OnDownloadProgressListener> progressListeners = new CopyOnWriteArrayList<>();
+    /** Active download tasks, keyed by song key (bilibili_<cid> or netease_<id>). */
+    private static final LinkedHashMap<String, DownloadProgress> activeDownloads = new LinkedHashMap<>();
+
     public interface DownloadCallback {
         void onSuccess(String filePath);
         void onError(String message);
@@ -52,6 +118,56 @@ public class DownloadManager {
 
     private static volatile boolean batchCancelled = false;
 
+    /** Register a progress listener. */
+    public static void addProgressListener(OnDownloadProgressListener listener) {
+        if (listener != null && !progressListeners.contains(listener)) {
+            progressListeners.add(listener);
+        }
+    }
+
+    /** Unregister a progress listener. */
+    public static void removeProgressListener(OnDownloadProgressListener listener) {
+        progressListeners.remove(listener);
+    }
+
+    /** Get all active download tasks (for initial UI state). */
+    public static Map<String, DownloadProgress> getActiveDownloads() {
+        return new LinkedHashMap<>(activeDownloads);
+    }
+
+    /** Generate a unique key for a song download task. */
+    private static String getSongKey(Song song) {
+        if (song.isBilibili()) {
+            return "bilibili_" + song.getCid();
+        }
+        return "netease_" + song.getId();
+    }
+
+    private static void notifyProgressChanged() {
+        mainHandler.post(() -> {
+            Map<String, DownloadProgress> snapshot = new LinkedHashMap<>(activeDownloads);
+            for (OnDownloadProgressListener l : progressListeners) {
+                l.onProgressChanged(snapshot);
+            }
+        });
+    }
+
+    private static void notifyDownloadAdded(DownloadProgress progress) {
+        mainHandler.post(() -> {
+            for (OnDownloadProgressListener l : progressListeners) {
+                l.onDownloadAdded(progress);
+            }
+        });
+    }
+
+    private static void notifyDownloadRemoved(String songKey) {
+        mainHandler.post(() -> {
+            for (OnDownloadProgressListener l : progressListeners) {
+                l.onDownloadRemoved(songKey);
+            }
+        });
+    }
+
     /**
      * Download a song to /sdcard/163Music/Download/<folder>/
      * Saves both song.mp3 and info.json (with song id, name, artist, album).
@@ -59,16 +175,29 @@ public class DownloadManager {
     public static void downloadSong(Song song, String cookie, DownloadCallback callback) {
         executor.execute(() -> {
             try {
+                String songKey = getSongKey(song);
+                // Remove completed/error entries for same song
+                activeDownloads.remove(songKey);
+
+                DownloadProgress progress = new DownloadProgress(song);
+                activeDownloads.put(songKey, progress);
+                notifyDownloadAdded(progress);
+
                 if (song.isBilibili()) {
                     BilibiliApiHelper.getAudioStreamUrl(song.getBvid(), song.getCid(), cookie,
                             new BilibiliApiHelper.AudioStreamCallback() {
                                 @Override
                                 public void onResult(String url) {
-                                    executor.execute(() -> doDownload(song, url, true, callback));
+                                    executor.execute(() -> {
+                                        doDownload(song, url, true, callback, songKey, progress);
+                                    });
                                 }
 
                                 @Override
                                 public void onError(String message) {
+                                    progress.status = "error";
+                                    progress.errorMsg = message;
+                                    notifyProgressChanged();
                                     mainHandler.post(() -> callback.onError("获取下载链接失败: " + message));
                                 }
                             });
@@ -78,11 +207,16 @@ public class DownloadManager {
                 MusicApiHelper.getSongUrl(song.getId(), cookie, new MusicApiHelper.UrlCallback() {
                     @Override
                     public void onResult(String url) {
-                        executor.execute(() -> doDownload(song, url, false, callback));
+                        executor.execute(() -> {
+                            doDownload(song, url, false, callback, songKey, progress);
+                        });
                     }
 
                     @Override
                     public void onError(String message) {
+                        progress.status = "error";
+                        progress.errorMsg = message;
+                        notifyProgressChanged();
                         mainHandler.post(() -> callback.onError("获取下载链接失败: " + message));
                     }
                 });
@@ -93,17 +227,30 @@ public class DownloadManager {
     }
 
     private static void doDownload(Song song, String urlStr, boolean bilibili,
-                                   DownloadCallback callback) {
+                                   DownloadCallback callback, String songKey,
+                                   DownloadProgress progress) {
         try {
             File songDir = getSongDir(song);
             if (!songDir.exists()) {
                 if (!songDir.mkdirs()) {
+                    progress.status = "error";
+                    progress.errorMsg = "无法创建下载目录";
+                    notifyProgressChanged();
                     mainHandler.post(() -> callback.onError("无法创建下载目录"));
                     return;
                 }
             }
 
-            File outputFile = new File(songDir, SONG_FILE);
+            // For Bilibili: download to temp file first, then transcode
+            File outputFile;
+            File tempFile = null;
+            if (bilibili) {
+                tempFile = new File(songDir, "song.tmp");
+                outputFile = new File(songDir, SONG_FILE);
+            } else {
+                outputFile = new File(songDir, SONG_FILE);
+            }
+            File downloadTarget = bilibili ? tempFile : outputFile;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -115,32 +262,94 @@ public class DownloadManager {
             }
 
             try {
+                int contentLength = conn.getContentLength();
+                progress.totalBytes = contentLength > 0 ? contentLength : -1;
+
                 InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(outputFile);
+                FileOutputStream fos = new FileOutputStream(downloadTarget);
                 byte[] buffer = new byte[8192];
                 int len;
+                long totalRead = 0;
                 while ((len = is.read(buffer)) != -1) {
                     fos.write(buffer, 0, len);
+                    totalRead += len;
+
+                    progress.downloadedBytes = totalRead;
+                    if (progress.totalBytes > 0) {
+                        progress.percent = (int) (totalRead * 100 / progress.totalBytes);
+                    }
+                    progress.updateSpeed();
+                    notifyProgressChanged();
                 }
                 fos.flush();
                 fos.close();
                 is.close();
 
+                // For Bilibili: transcode MP4 audio to proper M4A/AAC
+                if (bilibili && tempFile.exists()) {
+                    boolean needsTranscode = AudioTranscoder.needsTranscoding(tempFile.getAbsolutePath());
+                    if (needsTranscode) {
+                        Log.i(TAG, "Bilibili audio needs transcoding: " + tempFile.getAbsolutePath());
+                        progress.status = "transcoding";
+                        progress.percent = -1; // indeterminate
+                        notifyProgressChanged();
+
+                        boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
+                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+
+                        if (transcodeOk) {
+                            // Transcode success, delete temp file
+                            tempFile.delete();
+                            Log.i(TAG, "Bilibili audio transcoded successfully: " + song.getName());
+                        } else {
+                            // Transcode failed, rename temp as fallback
+                            Log.w(TAG, "Bilibili transcode failed, keeping original for " + song.getName());
+                            if (!outputFile.exists()) {
+                                tempFile.renameTo(outputFile);
+                            } else {
+                                tempFile.delete();
+                            }
+                        }
+                    } else {
+                        // Already playable format, just rename
+                        tempFile.renameTo(outputFile);
+                    }
+                }
+
                 // Save song info JSON
                 saveSongInfo(songDir, song);
 
-                // Download lyrics
+                // Download lyrics (NetEase only)
                 if (!bilibili) {
                     downloadLyrics(songDir, song);
                 }
 
-                String filePath = outputFile.getAbsolutePath();
+                progress.downloadedBytes = totalRead;
+                progress.totalBytes = totalRead;
+                progress.percent = 100;
+                progress.status = "complete";
+                notifyProgressChanged();
+
+                // Delay removal so UI can show "complete" briefly
+                final String filePath = outputFile.getAbsolutePath();
+                mainHandler.postDelayed(() -> {
+                    activeDownloads.remove(songKey);
+                    notifyDownloadRemoved(songKey);
+                }, 2000);
+
                 mainHandler.post(() -> callback.onSuccess(filePath));
             } finally {
                 conn.disconnect();
             }
         } catch (Exception e) {
             Log.w(TAG, "Download error", e);
+            progress.status = "error";
+            progress.errorMsg = e.getMessage();
+            notifyProgressChanged();
+            mainHandler.postDelayed(() -> {
+                activeDownloads.remove(songKey);
+                notifyDownloadRemoved(songKey);
+            }, 3000);
             mainHandler.post(() -> callback.onError("下载失败: " + e.getMessage()));
         }
     }
@@ -314,7 +523,42 @@ public class DownloadManager {
      * Check if a batch download is in progress.
      */
     public static boolean isBatchDownloading() {
-        return batchCancelled; // reuse flag: while batch is active, this is false; after cancel set true
+        // Check if any active download is in progress
+        for (DownloadProgress p : activeDownloads.values()) {
+            if ("downloading".equals(p.status) || "transcoding".equals(p.status)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Get the count of currently active downloads.
+     */
+    public static int getActiveDownloadCount() {
+        return activeDownloads.size();
+    }
+
+    /**
+     * Get a summary of active downloads for UI display.
+     * Returns null if no active downloads.
+     */
+    public static String getActiveDownloadSummary() {
+        if (activeDownloads.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        for (DownloadProgress p : activeDownloads.values()) {
+            if (sb.length() > 0) sb.append("\n");
+            if ("downloading".equals(p.status)) {
+                sb.append(p.song.getName()).append(" ").append(p.percent).append("%");
+            } else if ("transcoding".equals(p.status)) {
+                sb.append(p.song.getName()).append(" 转码中...");
+            } else if ("complete".equals(p.status)) {
+                sb.append(p.song.getName()).append(" 下载完成");
+            } else if ("error".equals(p.status)) {
+                sb.append(p.song.getName()).append(" 失败");
+            }
+        }
+        return sb.toString();
     }
 
     /**
@@ -380,15 +624,39 @@ public class DownloadManager {
     /**
      * Synchronous file download (blocks caller thread).
      * Returns true on success.
+     * Also updates progress tracking for batch downloads.
+     * For Bilibili songs: downloads to temp file, then transcodes MP4→M4A.
      */
     private static boolean doDownloadSync(Song song, String urlStr, boolean bilibili) {
+        String songKey = getSongKey(song);
+        // Clean up previous entry for same song
+        activeDownloads.remove(songKey);
+
+        DownloadProgress progress = new DownloadProgress(song);
+        activeDownloads.put(songKey, progress);
+        notifyDownloadAdded(progress);
+
         try {
             File songDir = getSongDir(song);
             if (!songDir.exists()) {
-                if (!songDir.mkdirs()) return false;
+                if (!songDir.mkdirs()) {
+                    progress.status = "error";
+                    progress.errorMsg = "无法创建下载目录";
+                    notifyProgressChanged();
+                    return false;
+                }
             }
 
-            File outputFile = new File(songDir, SONG_FILE);
+            // For Bilibili: download to temp file first, then transcode
+            File outputFile;
+            File tempFile = null;
+            if (bilibili) {
+                tempFile = new File(songDir, "song.tmp");
+                outputFile = new File(songDir, SONG_FILE);
+            } else {
+                outputFile = new File(songDir, SONG_FILE);
+            }
+            File downloadTarget = bilibili ? tempFile : outputFile;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -400,33 +668,102 @@ public class DownloadManager {
             }
 
             try {
+                int contentLength = conn.getContentLength();
+                progress.totalBytes = contentLength > 0 ? contentLength : -1;
+
                 InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(outputFile);
+                FileOutputStream fos = new FileOutputStream(downloadTarget);
                 byte[] buffer = new byte[8192];
                 int len;
+                long totalRead = 0;
                 while ((len = is.read(buffer)) != -1) {
                     if (batchCancelled) {
                         fos.close();
                         is.close();
-                        outputFile.delete();
+                        downloadTarget.delete();
+                        progress.status = "error";
+                        progress.errorMsg = "已取消";
+                        notifyProgressChanged();
+                        activeDownloads.remove(songKey);
+                        notifyDownloadRemoved(songKey);
                         return false;
                     }
                     fos.write(buffer, 0, len);
+                    totalRead += len;
+
+                    progress.downloadedBytes = totalRead;
+                    if (progress.totalBytes > 0) {
+                        progress.percent = (int) (totalRead * 100 / progress.totalBytes);
+                    }
+                    progress.updateSpeed();
+                    // Throttle UI notifications to reduce overhead
+                    if (progress.percent % 3 == 0 || progress.downloadedBytes == progress.totalBytes) {
+                        notifyProgressChanged();
+                    }
                 }
                 fos.flush();
                 fos.close();
                 is.close();
 
+                // For Bilibili: transcode MP4 audio to proper M4A/AAC
+                if (bilibili && tempFile != null && tempFile.exists()) {
+                    boolean needsTranscode = AudioTranscoder.needsTranscoding(tempFile.getAbsolutePath());
+                    if (needsTranscode) {
+                        Log.i(TAG, "Bilibili audio needs transcoding: " + song.getName());
+                        progress.status = "transcoding";
+                        progress.percent = -1;
+                        notifyProgressChanged();
+
+                        boolean transcodeOk = AudioTranscoder.transcodeToMp3Sync(
+                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
+
+                        if (transcodeOk) {
+                            tempFile.delete();
+                            Log.i(TAG, "Bilibili audio transcoded: " + song.getName());
+                        } else {
+                            Log.w(TAG, "Bilibili transcode failed, keeping original: " + song.getName());
+                            if (!outputFile.exists()) {
+                                tempFile.renameTo(outputFile);
+                            } else {
+                                tempFile.delete();
+                            }
+                        }
+                    } else {
+                        // Already playable, just rename
+                        tempFile.renameTo(outputFile);
+                    }
+                }
+
                 saveSongInfo(songDir, song);
                 if (!bilibili) {
                     downloadLyrics(songDir, song);
                 }
+
+                progress.downloadedBytes = totalRead;
+                progress.totalBytes = totalRead;
+                progress.percent = 100;
+                progress.status = "complete";
+                notifyProgressChanged();
+
+                // Remove completed entry after a short delay
+                mainHandler.postDelayed(() -> {
+                    activeDownloads.remove(songKey);
+                    notifyDownloadRemoved(songKey);
+                }, 1500);
+
                 return true;
             } finally {
                 conn.disconnect();
             }
         } catch (Exception e) {
             Log.w(TAG, "Download error for " + song.getName(), e);
+            progress.status = "error";
+            progress.errorMsg = e.getMessage();
+            notifyProgressChanged();
+            mainHandler.postDelayed(() -> {
+                activeDownloads.remove(songKey);
+                notifyDownloadRemoved(songKey);
+            }, 3000);
             return false;
         }
     }
