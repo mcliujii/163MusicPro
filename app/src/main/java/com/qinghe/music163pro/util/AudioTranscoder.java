@@ -1,22 +1,23 @@
 package com.qinghe.music163pro.util;
 
 import android.media.MediaCodec;
+import android.media.MediaCodecInfo;
 import android.media.MediaExtractor;
 import android.media.MediaFormat;
+import android.media.MediaMuxer;
 import android.util.Log;
-
-import com.hzy.liblame.LameUtil;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 
 /**
- * Transcodes audio files (AAC, M4A, Opus, WebM, etc.) to proper MP3 format.
- * Uses Android's built-in MediaExtractor + MediaCodec for decoding,
- * and LAME for MP3 encoding.
+ * Transcodes audio files (AAC, M4A, Opus, WebM, m4s fragments, etc.) to proper M4A/AAC format.
+ * Uses Android's built-in MediaExtractor + MediaCodec + MediaMuxer — zero external dependencies.
+ *
+ * The output is a standard MPEG-4 container with AAC audio, saved with the caller's desired
+ * extension. Android's ExoPlayer (used by this app) detects format by header, not extension.
  *
  * Usage:
  *   AudioTranscoder.transcodeToMp3(inputPath, outputPath, callback);
@@ -26,8 +27,7 @@ import java.nio.ByteOrder;
 public class AudioTranscoder {
 
     private static final String TAG = "AudioTranscoder";
-    private static final int MP3_BITRATE = 128;   // kbps
-    private static final int MP3_QUALITY = 2;     // 0=best..9=worst
+    private static final int AAC_BITRATE = 128000;  // 128 kbps
     private static final int TIMEOUT_US = 10000;
 
     public interface TranscodeCallback {
@@ -37,7 +37,7 @@ public class AudioTranscoder {
     }
 
     /**
-     * Transcode an audio file to MP3 format asynchronously.
+     * Transcode an audio file to M4A/AAC format asynchronously.
      */
     public static void transcodeToMp3(String inputPath, String outputPath, TranscodeCallback callback) {
         new Thread(() -> {
@@ -51,14 +51,67 @@ public class AudioTranscoder {
     }
 
     /**
-     * Transcode an audio file to MP3 format synchronously (blocks caller thread).
+     * Transcode an audio file to proper M4A/AAC format synchronously (blocks caller thread).
+     * Uses two-phase approach: decode to PCM file, then encode PCM to M4A.
      * @return true on success, false on failure
      */
     public static boolean transcodeToMp3Sync(String inputPath, String outputPath) {
         File inputFile = new File(inputPath);
         File outputFile = new File(outputPath);
-        File tempFile = new File(outputPath + ".mp3enc");
+        File tempPcm = new File(outputPath + ".pcm");
+        File tempM4a = new File(outputPath + ".m4aenc");
 
+        try {
+            // Phase 1: Extract audio info and decode to raw PCM
+            int[] audioInfo = new int[2]; // [0]=sampleRate, [1]=channelCount
+            boolean decodeOk = decodeToPcm(inputPath, tempPcm.getAbsolutePath(), audioInfo);
+            if (!decodeOk) {
+                Log.w(TAG, "Phase 1 decode failed for " + inputPath);
+                return false;
+            }
+
+            int sampleRate = audioInfo[0];
+            int channelCount = audioInfo[1];
+            Log.i(TAG, "Decoded to PCM: " + sampleRate + "Hz, " + channelCount + "ch, "
+                    + (tempPcm.length() / 1024) + "KB PCM");
+
+            // Phase 2: Encode PCM to M4A/AAC
+            boolean encodeOk = encodePcmToM4a(
+                    tempPcm.getAbsolutePath(), sampleRate, channelCount,
+                    tempM4a.getAbsolutePath());
+            if (!encodeOk) {
+                Log.w(TAG, "Phase 2 encode failed");
+                tempPcm.delete();
+                return false;
+            }
+
+            // Cleanup temp files
+            tempPcm.delete();
+            if (inputFile.exists()) {
+                inputFile.delete();
+            }
+            tempM4a.renameTo(outputFile);
+
+            Log.i(TAG, "Transcode complete: " + outputPath
+                    + " (" + sampleRate + "Hz, " + channelCount + "ch, AAC " + (AAC_BITRATE / 1000) + "kbps)");
+            return true;
+
+        } catch (Exception e) {
+            Log.e(TAG, "Transcode error for " + inputPath, e);
+            tempPcm.delete();
+            tempM4a.delete();
+            return false;
+        }
+    }
+
+    /**
+     * Phase 1: Decode any audio file to raw PCM using MediaExtractor + MediaCodec.
+     * @param inputPath input audio file path
+     * @param pcmPath output raw PCM file path (16-bit signed, native byte order)
+     * @param outAudioInfo int[2] to receive [sampleRate, channelCount]
+     * @return true on success
+     */
+    private static boolean decodeToPcm(String inputPath, String pcmPath, int[] outAudioInfo) {
         MediaExtractor extractor = null;
         MediaCodec decoder = null;
         FileOutputStream fos = null;
@@ -67,7 +120,6 @@ public class AudioTranscoder {
             extractor = new MediaExtractor();
             extractor.setDataSource(inputPath);
 
-            // Find the best audio track
             int audioTrackIndex = findBestAudioTrack(extractor);
             if (audioTrackIndex < 0) {
                 Log.w(TAG, "No audio track found in " + inputPath);
@@ -77,10 +129,12 @@ public class AudioTranscoder {
             MediaFormat format = extractor.getTrackFormat(audioTrackIndex);
             extractor.selectTrack(audioTrackIndex);
 
-            int sampleRate = format.getInteger(MediaFormat.KEY_SAMPLE_RATE);
-            int channelCount = Math.max(1, format.getInteger(MediaFormat.KEY_CHANNEL_COUNT));
-            long durationUs = format.containsKey(MediaFormat.KEY_DURATION)
-                    ? format.getLong(MediaFormat.KEY_DURATION) : 0;
+            int sampleRate = format.containsKey(MediaFormat.KEY_SAMPLE_RATE)
+                    ? format.getInteger(MediaFormat.KEY_SAMPLE_RATE) : 44100;
+            int channelCount = format.containsKey(MediaFormat.KEY_CHANNEL_COUNT)
+                    ? Math.max(1, format.getInteger(MediaFormat.KEY_CHANNEL_COUNT)) : 2;
+            outAudioInfo[0] = sampleRate;
+            outAudioInfo[1] = channelCount;
 
             // Create decoder
             String mime = format.getString(MediaFormat.KEY_MIME);
@@ -88,21 +142,16 @@ public class AudioTranscoder {
             decoder.configure(format, null, null, 0);
             decoder.start();
 
-            // Initialize LAME encoder
-            int lameMode = (channelCount == 1) ? 3 : 0; // 3=mono, 0=stereo
-            LameUtil.init(sampleRate, sampleRate, channelCount, MP3_BITRATE, MP3_QUALITY, lameMode);
-            int mp3BufSize = LameUtil.getMP3BufferSize();
-            byte[] mp3Buffer = new byte[mp3BufSize];
-
-            fos = new FileOutputStream(tempFile);
-
-            // Decode loop
+            fos = new FileOutputStream(pcmPath);
             MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
             boolean inputDone = false;
             boolean outputDone = false;
-            long totalEncodedTime = 0;
+            long totalDecoded = 0;
+            long durationUs = format.containsKey(MediaFormat.KEY_DURATION)
+                    ? format.getLong(MediaFormat.KEY_DURATION) : 0;
 
             while (!outputDone) {
+                // Feed input to decoder
                 if (!inputDone) {
                     int inIdx = decoder.dequeueInputBuffer(TIMEOUT_US);
                     if (inIdx >= 0) {
@@ -112,16 +161,18 @@ public class AudioTranscoder {
                             decoder.queueInputBuffer(inIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                             inputDone = true;
                         } else {
-                            decoder.queueInputBuffer(inIdx, 0, sampleSize, extractor.getSampleTime(), 0);
+                            decoder.queueInputBuffer(inIdx, 0, sampleSize,
+                                    extractor.getSampleTime(), 0);
                             extractor.advance();
                         }
                     }
                 }
 
+                // Read decoded PCM output
                 if (!outputDone) {
                     int outIdx = decoder.dequeueOutputBuffer(info, TIMEOUT_US);
                     if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-                        // Ignore format change
+                        // Format change, ignore
                     } else if (outIdx >= 0) {
                         if (info.size > 0) {
                             ByteBuffer outBuf = decoder.getOutputBuffer(outIdx);
@@ -129,11 +180,8 @@ public class AudioTranscoder {
                             outBuf.position(info.offset);
                             outBuf.limit(info.offset + info.size);
                             outBuf.get(pcmBytes);
-
-                            // Encode PCM to MP3
-                            encodePcmToMp3(pcmBytes, channelCount, mp3Buffer, fos);
-
-                            totalEncodedTime += info.presentationTimeUs;
+                            fos.write(pcmBytes);
+                            totalDecoded += info.size;
                         }
                         decoder.releaseOutputBuffer(outIdx, false);
                         if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -143,46 +191,160 @@ public class AudioTranscoder {
                 }
             }
 
-            // Flush LAME encoder
-            int flushed = LameUtil.flush(mp3Buffer);
-            if (flushed > 0) {
-                fos.write(mp3Buffer, 0, flushed);
-            }
             fos.flush();
             fos.close();
             fos = null;
-
-            LameUtil.close();
             decoder.stop();
             decoder.release();
             decoder = null;
             extractor.release();
             extractor = null;
 
-            // Replace original with transcoded MP3
-            if (inputFile.exists()) inputFile.delete();
-            tempFile.renameTo(outputFile);
-
-            Log.i(TAG, "Transcode complete: " + outputPath
-                    + " (" + (totalEncodedTime / 1000000) + "s, "
-                    + sampleRate + "Hz, " + channelCount + "ch, " + MP3_BITRATE + "kbps)");
             return true;
-
         } catch (Exception e) {
-            Log.e(TAG, "Transcode error for " + inputPath, e);
-            // Cleanup
+            Log.e(TAG, "Decode error", e);
+            return false;
+        } finally {
             try { if (fos != null) fos.close(); } catch (Exception ignored) {}
-            try { LameUtil.close(); } catch (Exception ignored) {}
             try { if (decoder != null) { decoder.stop(); decoder.release(); } } catch (Exception ignored) {}
             try { if (extractor != null) extractor.release(); } catch (Exception ignored) {}
-            tempFile.delete();
-            return false;
         }
     }
 
     /**
-     * Quick check if a file is likely already a proper MP3 (MP3 frame sync).
-     * Returns true if the file starts with FF FB or FF F3 or ID3 tag.
+     * Phase 2: Encode raw PCM file to M4A/AAC using MediaCodec encoder + MediaMuxer.
+     * @param pcmPath input raw PCM file (16-bit signed, native byte order)
+     * @param sampleRate PCM sample rate
+     * @param channelCount PCM channel count (1=mono, 2=stereo)
+     * @param outputPath output M4A file path
+     * @return true on success
+     */
+    private static boolean encodePcmToM4a(String pcmPath, int sampleRate, int channelCount,
+                                          String outputPath) {
+        MediaCodec encoder = null;
+        MediaMuxer muxer = null;
+        FileInputStream fis = null;
+
+        try {
+            // Create AAC encoder
+            MediaFormat encoderFormat = MediaFormat.createAudioFormat(
+                    MediaFormat.MIMETYPE_AUDIO_AAC, sampleRate, channelCount);
+            encoderFormat.setInteger(MediaFormat.KEY_BIT_RATE, AAC_BITRATE);
+            encoderFormat.setInteger(MediaFormat.KEY_AAC_PROFILE,
+                    MediaCodecInfo.CodecProfileLevel.AACObjectLC);
+            encoderFormat.setInteger(MediaFormat.KEY_MAX_INPUT_SIZE, 8192);
+
+            encoder = MediaCodec.createEncoderByType(MediaFormat.MIMETYPE_AUDIO_AAC);
+            encoder.configure(encoderFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE);
+            encoder.start();
+
+            // Wait for encoder output format (needed before creating muxer track)
+            MediaFormat encoderOutputFormat = null;
+            MediaCodec.BufferInfo info = new MediaCodec.BufferInfo();
+            long waitStart = System.currentTimeMillis();
+            while (encoderOutputFormat == null) {
+                int idx = encoder.dequeueOutputBuffer(info, 5000);
+                if (idx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                    encoderOutputFormat = encoder.getOutputFormat();
+                } else if (idx >= 0) {
+                    // Release any premature output buffers
+                    encoder.releaseOutputBuffer(idx, false);
+                }
+                if (System.currentTimeMillis() - waitStart > 5000) {
+                    Log.e(TAG, "Timeout waiting for encoder output format");
+                    encoder.stop();
+                    encoder.release();
+                    return false;
+                }
+            }
+
+            // Create muxer and add track
+            muxer = new MediaMuxer(outputPath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4);
+            int muxerTrack = muxer.addTrack(encoderOutputFormat);
+            muxer.start();
+
+            // Read PCM and feed to encoder
+            fis = new FileInputStream(pcmPath);
+            int bytesPerFrame = channelCount * 2; // 16-bit = 2 bytes per sample
+            int frameSize = 4096 * bytesPerFrame; // ~4K samples per frame
+            byte[] readBuffer = new byte[frameSize];
+            long bytesPerSecond = (long) sampleRate * bytesPerFrame;
+            long totalRead = 0;
+
+            boolean inputDone = false;
+            boolean outputDone = false;
+
+            while (!outputDone) {
+                // Feed PCM data to encoder
+                if (!inputDone) {
+                    int inIdx = encoder.dequeueInputBuffer(TIMEOUT_US);
+                    if (inIdx >= 0) {
+                        ByteBuffer inBuf = encoder.getInputBuffer(inIdx);
+                        int bytesRead = fis.read(readBuffer);
+                        if (bytesRead <= 0) {
+                            encoder.queueInputBuffer(inIdx, 0, 0, 0,
+                                    MediaCodec.BUFFER_FLAG_END_OF_STREAM);
+                            inputDone = true;
+                        } else {
+                            inBuf.clear();
+                            inBuf.put(readBuffer, 0, bytesRead);
+                            // Calculate presentation timestamp based on PCM position
+                            long ptsUs = (totalRead * 1000000L) / bytesPerSecond;
+                            encoder.queueInputBuffer(inIdx, 0, bytesRead, ptsUs, 0);
+                            totalRead += bytesRead;
+                        }
+                    }
+                }
+
+                // Drain encoder output to muxer
+                if (!outputDone) {
+                    int outIdx = encoder.dequeueOutputBuffer(info, TIMEOUT_US);
+                    if (outIdx == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
+                        // Already handled
+                    } else if (outIdx == MediaCodec.INFO_TRY_AGAIN_LATER) {
+                        // No output available yet
+                    } else if (outIdx >= 0) {
+                        ByteBuffer outBuf = encoder.getOutputBuffer(outIdx);
+                        if (info.size > 0) {
+                            // Skip codec-config (CSD) buffers — muxer already has them
+                            if ((info.flags & MediaCodec.BUFFER_FLAG_CODEC_CONFIG) == 0) {
+                                outBuf.position(info.offset);
+                                outBuf.limit(info.offset + info.size);
+                                muxer.writeSampleData(muxerTrack, outBuf, info);
+                            }
+                        }
+                        encoder.releaseOutputBuffer(outIdx, false);
+                        if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
+                            outputDone = true;
+                        }
+                    }
+                }
+            }
+
+            // Cleanup in order
+            muxer.stop();
+            muxer.release();
+            muxer = null;
+            encoder.stop();
+            encoder.release();
+            encoder = null;
+            fis.close();
+            fis = null;
+
+            return true;
+        } catch (Exception e) {
+            Log.e(TAG, "Encode error", e);
+            return false;
+        } finally {
+            try { if (fis != null) fis.close(); } catch (Exception ignored) {}
+            try { if (muxer != null) muxer.release(); } catch (Exception ignored) {}
+            try { if (encoder != null) { encoder.stop(); encoder.release(); } } catch (Exception ignored) {}
+        }
+    }
+
+    /**
+     * Quick check if a file is likely already a proper MP3 (MP3 frame sync or ID3 tag).
+     * Returns true if the file starts with FF FB/F3/F2 or ID3 header.
      */
     public static boolean isLikelyMp3(String filePath) {
         try {
@@ -202,7 +364,7 @@ public class AudioTranscoder {
     }
 
     /**
-     * Get file extension from MIME type.
+     * Detect audio format by file extension and magic bytes.
      */
     public static String guessAudioFormat(String filePath) {
         if (filePath == null) return "unknown";
@@ -214,6 +376,7 @@ public class AudioTranscoder {
         if (lower.endsWith(".ogg")) return "ogg";
         if (lower.endsWith(".wav")) return "wav";
         if (lower.endsWith(".wma")) return "wma";
+        if (lower.endsWith(".m4s")) return "m4s/fragment";
         // Check file header for format detection
         try {
             FileInputStream fis = new FileInputStream(filePath);
@@ -232,14 +395,34 @@ public class AudioTranscoder {
             // ID3 or MP3 sync
             if (header[0] == 0x49 && header[1] == 0x44 && header[2] == 0x33) return "mp3";
             if (header[0] == (byte) 0xFF && (header[1] & 0xE0) == 0xE0) return "mp3";
-            // WebM
+            // WebM (EBML)
             if (header[0] == 0x1A && header[1] == 0x45 && header[2] == 0xDF && header[3] == 0xA3) return "webm";
+            // moof (fragmented MP4 — common for Bilibili m4s downloads)
+            if (header[0] == (byte) 0x30 && header[4] == 'm' && header[5] == 'o'
+                    && header[6] == 'o' && header[7] == 'f') return "m4s/fragment";
         } catch (Exception e) {
             // ignore
         }
         return "unknown";
     }
 
+    /**
+     * Check if a file needs transcoding (i.e., is NOT a standard MP3/M4A/AAC file
+     * that ExoPlayer can already play directly).
+     */
+    public static boolean needsTranscoding(String filePath) {
+        String format = guessAudioFormat(filePath);
+        // These formats are already playable by ExoPlayer directly
+        if (format.equals("mp3") || format.equals("m4a/aac")) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Find the best audio track in a MediaExtractor.
+     * Prefers higher bitrate tracks.
+     */
     private static int findBestAudioTrack(MediaExtractor extractor) {
         int best = -1;
         int bestBitrate = -1;
@@ -257,32 +440,5 @@ public class AudioTranscoder {
             }
         }
         return best;
-    }
-
-    private static void encodePcmToMp3(byte[] pcmBytes, int channelCount, byte[] mp3Buffer,
-                                         FileOutputStream fos) throws Exception {
-        short[] pcmShort = bytesToShorts(pcmBytes);
-        int numSamples = pcmShort.length / channelCount;
-
-        if (channelCount == 1) {
-            int encoded = LameUtil.encode(pcmShort, pcmShort, numSamples, mp3Buffer);
-            if (encoded > 0) fos.write(mp3Buffer, 0, encoded);
-        } else {
-            // De-interleave stereo PCM
-            short[] left = new short[numSamples];
-            short[] right = new short[numSamples];
-            for (int i = 0; i < numSamples; i++) {
-                left[i] = pcmShort[i * 2];
-                right[i] = pcmShort[i * 2 + 1];
-            }
-            int encoded = LameUtil.encode(left, right, numSamples, mp3Buffer);
-            if (encoded > 0) fos.write(mp3Buffer, 0, encoded);
-        }
-    }
-
-    private static short[] bytesToShorts(byte[] bytes) {
-        short[] shorts = new short[bytes.length / 2];
-        ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN).asShortBuffer().get(shorts);
-        return shorts;
     }
 }

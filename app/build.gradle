@@ -63,6 +63,5 @@ dependencies {
     // ExoPlayer / Media3
     implementation 'androidx.media3:media3-exoplayer:1.4.1'
     implementation 'androidx.media3:media3-ui:1.4.1'
-    // LAME MP3 encoder for transcoding Bilibili audio (~150KB native)
-    implementation 'com.github.hzy3774:AndroidMp3Encoder:1.0.3'
+    // No external MP3 encoder needed - uses Android built-in MediaCodec + MediaMuxer for transcoding
 }
