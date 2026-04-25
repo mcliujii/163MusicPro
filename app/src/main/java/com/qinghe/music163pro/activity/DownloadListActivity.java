@@ -289,7 +289,7 @@ public class DownloadListActivity extends BaseWatchActivity {
         LinearLayout.LayoutParams indicatorParams = new LinearLayout.LayoutParams(
                 com.qinghe.music163pro.util.WatchUiUtils.px(this, 3),
                 com.qinghe.music163pro.util.WatchUiUtils.px(this, 24));
-        indicatorParams.marginEnd = px6;
+        indicatorParams.setMarginEnd(px6);
         indicator.setBackgroundColor(0xFF03DAC6);
         indicator.setLayoutParams(indicatorParams);
         nameRow.addView(indicator);
