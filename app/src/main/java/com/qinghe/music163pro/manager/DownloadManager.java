@@ -9,7 +9,6 @@ import android.util.Log;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
-import com.qinghe.music163pro.util.AudioTranscoder;
 
 import org.json.JSONObject;
 
@@ -36,7 +35,6 @@ public class DownloadManager {
     private static final String DOWNLOAD_DIR = "163Music/Download";
     private static final String INFO_FILE = "info.json";
     private static final String SONG_FILE = "song.mp3";
-    private static final String TEMP_FILE = "song.tmp";
     private static final String LYRICS_FILE = "lyrics.lrc";
     private static final ExecutorService executor = Executors.newSingleThreadExecutor();
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
@@ -105,10 +103,7 @@ public class DownloadManager {
                 }
             }
 
-            // For Bilibili, download to temp file first for transcoding
-            File tempFile = bilibili ? new File(songDir, TEMP_FILE) : null;
-            File outputFile = bilibili ? new File(songDir, SONG_FILE) : new File(songDir, SONG_FILE);
-            File downloadTarget = (bilibili && tempFile != null) ? tempFile : outputFile;
+            File outputFile = new File(songDir, SONG_FILE);
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -121,7 +116,7 @@ public class DownloadManager {
 
             try {
                 InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(downloadTarget);
+                FileOutputStream fos = new FileOutputStream(outputFile);
                 byte[] buffer = new byte[8192];
                 int len;
                 while ((len = is.read(buffer)) != -1) {
@@ -130,29 +125,6 @@ public class DownloadManager {
                 fos.flush();
                 fos.close();
                 is.close();
-
-                // For Bilibili: transcode to proper MP3 if needed
-                if (bilibili && tempFile != null) {
-                    Log.i(TAG, "Bilibili download complete, checking format...");
-                    String format = AudioTranscoder.guessAudioFormat(tempFile.getAbsolutePath());
-                    Log.i(TAG, "Detected format: " + format);
-                    if (AudioTranscoder.isLikelyMp3(tempFile.getAbsolutePath())) {
-                        // Already MP3, just rename
-                        tempFile.renameTo(outputFile);
-                        Log.i(TAG, "Already MP3, renamed directly");
-                    } else {
-                        // Transcode to MP3
-                        Log.i(TAG, "Transcoding " + format + " to MP3...");
-                        boolean ok = AudioTranscoder.transcodeToMp3Sync(
-                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
-                        if (!ok) {
-                            // Transcode failed, rename as fallback
-                            Log.w(TAG, "Transcode failed, renaming as fallback");
-                            tempFile.renameTo(outputFile);
-                        }
-                        // transcodeToMp3Sync deletes input file on success
-                    }
-                }
 
                 // Save song info JSON
                 saveSongInfo(songDir, song);
@@ -416,10 +388,7 @@ public class DownloadManager {
                 if (!songDir.mkdirs()) return false;
             }
 
-            // For Bilibili, download to temp file first for transcoding
-            File tempFile = bilibili ? new File(songDir, TEMP_FILE) : null;
             File outputFile = new File(songDir, SONG_FILE);
-            File downloadTarget = (bilibili && tempFile != null) ? tempFile : outputFile;
 
             URL url = new URL(urlStr);
             HttpURLConnection conn = (HttpURLConnection) url.openConnection();
@@ -432,14 +401,14 @@ public class DownloadManager {
 
             try {
                 InputStream is = conn.getInputStream();
-                FileOutputStream fos = new FileOutputStream(downloadTarget);
+                FileOutputStream fos = new FileOutputStream(outputFile);
                 byte[] buffer = new byte[8192];
                 int len;
                 while ((len = is.read(buffer)) != -1) {
                     if (batchCancelled) {
                         fos.close();
                         is.close();
-                        downloadTarget.delete();
+                        outputFile.delete();
                         return false;
                     }
                     fos.write(buffer, 0, len);
@@ -447,29 +416,6 @@ public class DownloadManager {
                 fos.flush();
                 fos.close();
                 is.close();
-
-                // For Bilibili: transcode to proper MP3 if needed
-                if (bilibili && tempFile != null) {
-                    if (batchCancelled) {
-                        tempFile.delete();
-                        return false;
-                    }
-                    Log.i(TAG, "Bilibili download complete, checking format...");
-                    String format = AudioTranscoder.guessAudioFormat(tempFile.getAbsolutePath());
-                    Log.i(TAG, "Detected format: " + format);
-                    if (AudioTranscoder.isLikelyMp3(tempFile.getAbsolutePath())) {
-                        tempFile.renameTo(outputFile);
-                        Log.i(TAG, "Already MP3, renamed directly");
-                    } else {
-                        Log.i(TAG, "Transcoding " + format + " to MP3...");
-                        boolean ok = AudioTranscoder.transcodeToMp3Sync(
-                                tempFile.getAbsolutePath(), outputFile.getAbsolutePath());
-                        if (!ok) {
-                            Log.w(TAG, "Transcode failed, renaming as fallback");
-                            tempFile.renameTo(outputFile);
-                        }
-                    }
-                }
 
                 saveSongInfo(songDir, song);
                 if (!bilibili) {
