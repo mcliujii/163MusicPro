@@ -19,6 +19,7 @@ import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.DownloadTask;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
+import com.qinghe.music163pro.util.WatchConfirmDialog;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -185,9 +186,9 @@ public class DownloadProgressActivity extends BaseWatchActivity {
     }
 
     private void showCancelDialog(DownloadTask task) {
-        showConfirmDialog("取消下载", "确定取消下载「" + task.getSong().getName() + "」？", () -> {
+        WatchConfirmDialog.show(this, "取消下载", "确定取消下载「" + task.getSong().getName() + "」？", () -> {
             batchDownloadManager.cancelDownload(task.getTaskId());
-        });
+        }, new WatchConfirmDialog.Options(0xFF1E1E1E, 0xFFBB86FC, true));
     }
 
     /**
