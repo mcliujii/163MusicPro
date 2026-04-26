@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Color;
 import android.graphics.PorterDuff;
@@ -22,7 +21,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.util.MusicLog;
@@ -76,11 +74,6 @@ public class CommentFloorActivity extends BaseWatchActivity {
     private LinearLayout subCommentListLayout;
     private ScrollView commentScrollView;
     private EditText inputField;
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     private TextView sendButton;
 
     @Override

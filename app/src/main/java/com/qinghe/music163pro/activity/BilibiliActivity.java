@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -12,7 +11,6 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchUiUtils;
 
@@ -22,11 +20,6 @@ import com.qinghe.music163pro.util.WatchUiUtils;
  * - 登录 (Bilibili QR login)
  */
 public class BilibiliActivity extends BaseWatchActivity {
-
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
 
     private LinearLayout cloudFavoritesItem;
 

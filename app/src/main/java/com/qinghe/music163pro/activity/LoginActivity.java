@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -11,7 +10,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 
@@ -25,11 +23,6 @@ public class LoginActivity extends AppCompatActivity {
 
     private EditText etCookie;
     private SharedPreferences prefs;
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     private MusicPlayerManager playerManager;
 
     @Override

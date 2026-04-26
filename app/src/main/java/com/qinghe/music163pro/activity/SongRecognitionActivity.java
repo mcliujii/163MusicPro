@@ -1,7 +1,6 @@
 package com.qinghe.music163pro.activity;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
@@ -28,7 +27,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.model.Song;
@@ -79,11 +77,6 @@ public class SongRecognitionActivity extends AppCompatActivity {
     private AcousticEchoCanceler acousticEchoCanceler;
     private NoiseSuppressor noiseSuppressor;
     private Runnable countdownRunnable;
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     private boolean pausedPlaybackForRecognition = false;
 
     @Override

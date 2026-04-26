@@ -1,7 +1,6 @@
 package com.qinghe.music163pro.activity;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Typeface;
@@ -23,7 +22,6 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.core.content.FileProvider;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.util.UpdateChecker;
 
 import java.io.File;
@@ -47,11 +45,6 @@ public class UpdateActivity extends AppCompatActivity {
     private LinearLayout sourcesContainer;
     private TextView tvSourceHint;
     private boolean downloading = false;
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     private String selectedUrl = null;
 
     @Override

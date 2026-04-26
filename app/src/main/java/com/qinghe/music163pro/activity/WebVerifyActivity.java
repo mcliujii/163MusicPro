@@ -2,7 +2,6 @@ package com.qinghe.music163pro.activity;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.os.Bundle;
@@ -17,7 +16,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.util.MusicLog;
 
 /**
@@ -38,11 +36,6 @@ public class WebVerifyActivity extends AppCompatActivity {
 
     private WebView webView;
     private boolean resultDelivered = false;
-
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
 
     @SuppressLint("SetJavaScriptEnabled")
     @Override

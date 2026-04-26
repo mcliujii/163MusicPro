@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.Color;
@@ -12,7 +11,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.MusicApiHelper;
 import com.qinghe.music163pro.player.MusicPlayerManager;
@@ -34,11 +32,6 @@ public class QrLoginActivity extends AppCompatActivity {
     private String qrKey = "";
     private final Handler pollHandler = new Handler();
     private boolean polling = false;
-
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
 
     private static final int POLL_INTERVAL_MS = 3000;
 

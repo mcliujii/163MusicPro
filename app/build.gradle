@@ -63,5 +63,4 @@ dependencies {
     // ExoPlayer / Media3
     implementation 'androidx.media3:media3-exoplayer:1.4.1'
     implementation 'androidx.media3:media3-ui:1.4.1'
-    // No external MP3 encoder needed - uses Android built-in MediaCodec + MediaMuxer for transcoding
 }

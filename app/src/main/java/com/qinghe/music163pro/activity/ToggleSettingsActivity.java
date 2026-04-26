@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.WindowManager;
@@ -11,7 +10,6 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.switchmaterial.SwitchMaterial;
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 
@@ -32,14 +30,15 @@ public class ToggleSettingsActivity extends AppCompatActivity {
     private SwitchMaterial switchFavMode;
     private TextView tvSpeedModeValue;
     private TextView tvRecognitionModeValue;
+    private TextView tvDpiValue;
+    private LinearLayout rowDpi;
     private SharedPreferences prefs;
+    
+    private static final String PREF_DPI_SCALE = "dpi_scale";
+    private static final float[] DPI_SCALES = {0.8f, 0.9f, 1.0f, 1.1f, 1.2f};
+    private static final String[] DPI_LABELS = {"80%", "90%", "100%", "110%", "120%"};
 
     /** Suppress listener callbacks while programmatically setting switch state. */
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
     private boolean updatingSwitch = false;
 
     @Override
@@ -58,8 +57,10 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         switchFavMode = findViewById(R.id.switch_fav_mode);
         tvSpeedModeValue = findViewById(R.id.tv_speed_mode_value);
         tvRecognitionModeValue = findViewById(R.id.tv_recognition_mode_value);
+        tvDpiValue = findViewById(R.id.tv_dpi_value);
         LinearLayout rowSpeedMode = findViewById(R.id.row_speed_mode);
         LinearLayout rowRecognitionMode = findViewById(R.id.row_recognition_mode);
+        rowDpi = findViewById(R.id.row_dpi);
 
         // Initialise switch states from prefs
         syncSwitchStates();
@@ -86,6 +87,7 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         // Speed mode: tap row to cycle through 3 values
         rowSpeedMode.setOnClickListener(v -> cycleSpeedMode());
         rowRecognitionMode.setOnClickListener(v -> cycleRecognitionMode());
+        rowDpi.setOnClickListener(v -> cycleDpi());
     }
 
     @Override
@@ -101,6 +103,8 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         updatingSwitch = false;
         updateSpeedModeValue();
         updateRecognitionModeValue();
+        updateDpiValue();
+        applyDpiScale();
     }
 
     private void cycleSpeedMode() {
@@ -135,5 +139,34 @@ public class ToggleSettingsActivity extends AppCompatActivity {
         int mode = prefs.getInt(PREF_RECOGNITION_MODE, MODE_AUTO);
         String[] labels = {"手动暂停", "自动识别"};
         tvRecognitionModeValue.setText(labels[mode]);
+    }
+
+    private void cycleDpi() {
+        int currentIndex = prefs.getInt(PREF_DPI_SCALE, 2); // Default to 100% (index 2)
+        int nextIndex = (currentIndex + 1) % DPI_SCALES.length;
+        prefs.edit().putInt(PREF_DPI_SCALE, nextIndex).apply();
+        updateDpiValue();
+        applyDpiScale();
+        Toast.makeText(this, "界面缩放: " + DPI_LABELS[nextIndex], Toast.LENGTH_SHORT).show();
+    }
+
+    private void updateDpiValue() {
+        int index = prefs.getInt(PREF_DPI_SCALE, 2);
+        tvDpiValue.setText(DPI_LABELS[index]);
+    }
+
+    private void applyDpiScale() {
+        int index = prefs.getInt(PREF_DPI_SCALE, 2);
+        float scale = DPI_SCALES[index];
+        
+        android.util.DisplayMetrics metrics = new android.util.DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(metrics);
+        
+        float defaultDensity = metrics.density;
+        metrics.density = defaultDensity * scale;
+        metrics.scaledDensity = defaultDensity * scale;
+        
+        // Apply to resources
+        getResources().getDisplayMetrics().setTo(metrics);
     }
 }

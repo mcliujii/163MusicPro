@@ -223,7 +223,7 @@ public class BilibiliApiHelper {
                 JSONObject data = json.getJSONObject("data");
                 String audioUrl = null;
 
-                // Try dash.audio first (pure audio stream, no video)
+                // Try dash.audio first
                 JSONObject dash = data.optJSONObject("dash");
                 if (dash != null) {
                     JSONArray audioArray = dash.optJSONArray("audio");
@@ -232,12 +232,11 @@ public class BilibiliApiHelper {
                     }
                 }
 
-                // Fallback to durl (may contain video+audio combined)
+                // Fallback to durl
                 if (audioUrl == null || audioUrl.isEmpty()) {
                     JSONArray durl = data.optJSONArray("durl");
                     if (durl != null && durl.length() > 0) {
                         audioUrl = durl.getJSONObject(0).optString("url", null);
-                        Log.w(TAG, "Using durl fallback (may contain video), will transcode to audio-only");
                     }
                 }
 

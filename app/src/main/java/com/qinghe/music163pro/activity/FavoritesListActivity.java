@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -17,7 +16,6 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchConfirmDialog;
 import com.qinghe.music163pro.api.MusicApiHelper;
@@ -48,11 +46,6 @@ public class FavoritesListActivity extends BaseWatchActivity {
     private ListView lvFavPlaylists;
     private TextView tabFavSongs;
     private TextView tabFavPlaylists;
-
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
 
     private boolean isSongTab = true;
 

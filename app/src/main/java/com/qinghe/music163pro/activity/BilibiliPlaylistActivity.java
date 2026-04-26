@@ -1,6 +1,5 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.os.Bundle;
@@ -15,19 +14,15 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.google.android.material.button.MaterialButton;
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.api.BilibiliApiHelper;
 import com.qinghe.music163pro.manager.BilibiliFavoritesManager;
-import com.qinghe.music163pro.manager.DownloadManager;
 import com.qinghe.music163pro.model.BilibiliFavorite;
 import com.qinghe.music163pro.model.Song;
 import com.qinghe.music163pro.player.MusicPlayerManager;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class BilibiliPlaylistActivity extends BaseWatchActivity {
 
@@ -38,23 +33,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
     private TextView tvSubtitle;
     private TextView tvEmpty;
     private ImageView btnFavorite;
-    private ImageView btnDownloadAll;
     private LinearLayout listContainer;
-    private LinearLayout selectBar;
     private MaterialButton btnPlayAll;
 
     private final List<BilibiliApiHelper.BilibiliPage> fetchedPages = new ArrayList<>();
     private BilibiliFavoritesManager favoritesManager;
-
-    // Multi-select state
-    private final Set<Integer> selectedPositions = new HashSet<>();
-    private boolean isSelectMode = false;
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
-
-    private boolean isBatchDownloading = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -82,28 +65,11 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         tvSubtitle.setPadding(0, 0, 0, px(8));
         root.addView(tvSubtitle);
 
-        LinearLayout buttonRow = new LinearLayout(this);
-        buttonRow.setOrientation(LinearLayout.HORIZONTAL);
-        buttonRow.setLayoutParams(new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        buttonRow.setGravity(Gravity.CENTER_HORIZONTAL);
-
         btnPlayAll = createWatchButton("全部播放", false);
-        LinearLayout.LayoutParams playAllParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        btnPlayAll.setLayoutParams(playAllParams);
+        btnPlayAll.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         btnPlayAll.setOnClickListener(v -> playIndex(0));
-        buttonRow.addView(btnPlayAll);
-
-        MaterialButton btnDownloadAllBtn = createWatchButton("全部下载", false);
-        LinearLayout.LayoutParams dlAllParams = new LinearLayout.LayoutParams(
-                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f);
-        dlAllParams.setMarginStart(px(6));
-        btnDownloadAllBtn.setLayoutParams(dlAllParams);
-        btnDownloadAllBtn.setOnClickListener(v -> startBatchDownloadAll());
-        buttonRow.addView(btnDownloadAllBtn);
-
-        root.addView(buttonRow);
+        root.addView(btnPlayAll);
 
         tvEmpty = new TextView(this);
         tvEmpty.setLayoutParams(new LinearLayout.LayoutParams(
@@ -117,47 +83,6 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         listContainer = new LinearLayout(this);
         listContainer.setOrientation(LinearLayout.VERTICAL);
         root.addView(listContainer);
-
-        // Bottom select bar
-        selectBar = new LinearLayout(this);
-        selectBar.setOrientation(LinearLayout.HORIZONTAL);
-        selectBar.setGravity(Gravity.CENTER);
-        selectBar.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
-        selectBar.setPadding(px(8), px(10), px(8), px(10));
-        LinearLayout.LayoutParams barParams = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        barParams.topMargin = px(8);
-        selectBar.setLayoutParams(barParams);
-        selectBar.setVisibility(View.GONE);
-
-        TextView tvSelectAll = new TextView(this);
-        tvSelectAll.setText("全选");
-        tvSelectAll.setTextColor(getResources().getColor(R.color.colorPrimary));
-        tvSelectAll.setTextSize(13);
-        tvSelectAll.setPadding(px(12), px(4), px(12), px(4));
-        tvSelectAll.setGravity(Gravity.CENTER);
-        tvSelectAll.setOnClickListener(v -> toggleSelectAll());
-        selectBar.addView(tvSelectAll);
-
-        TextView tvDownload = new TextView(this);
-        tvDownload.setText("下载(0)");
-        tvDownload.setTextColor(getResources().getColor(R.color.colorPrimary));
-        tvDownload.setTextSize(13);
-        tvDownload.setPadding(px(12), px(4), px(12), px(4));
-        tvDownload.setGravity(Gravity.CENTER);
-        tvDownload.setOnClickListener(v -> downloadSelected());
-        selectBar.addView(tvDownload);
-
-        TextView tvCancel = new TextView(this);
-        tvCancel.setText("取消");
-        tvCancel.setTextColor(getResources().getColor(R.color.text_secondary));
-        tvCancel.setTextSize(13);
-        tvCancel.setPadding(px(12), px(4), px(12), px(4));
-        tvCancel.setGravity(Gravity.CENTER);
-        tvCancel.setOnClickListener(v -> exitSelectMode());
-        selectBar.addView(tvCancel);
-
-        root.addView(selectBar);
 
         scrollView.addView(root);
         setContentView(scrollView);
@@ -176,13 +101,7 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         back.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         back.setImageResource(R.drawable.ic_arrow_back);
         back.setColorFilter(getResources().getColor(R.color.text_primary));
-        back.setOnClickListener(v -> {
-            if (isSelectMode) {
-                exitSelectMode();
-            } else {
-                finish();
-            }
-        });
+        back.setOnClickListener(v -> finish());
         bar.addView(back);
 
         TextView title = new TextView(this);
@@ -202,14 +121,6 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         btnFavorite.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
         btnFavorite.setOnClickListener(v -> toggleFavorite());
         bar.addView(btnFavorite);
-
-        btnDownloadAll = new ImageView(this);
-        btnDownloadAll.setLayoutParams(new LinearLayout.LayoutParams(px(22), px(22)));
-        btnDownloadAll.setImageResource(R.drawable.ic_get_app);
-        btnDownloadAll.setColorFilter(0x80FFFFFF);
-        btnDownloadAll.setOnClickListener(v -> startBatchDownloadAll());
-        bar.addView(btnDownloadAll);
-
         return bar;
     }
 
@@ -265,36 +176,16 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             item.setLayoutParams(params);
             item.setOrientation(LinearLayout.VERTICAL);
             item.setPadding(px(12), px(10), px(12), px(10));
-            boolean isSelected = selectedPositions.contains(index);
-            boolean isCurrent = (i == currentIndex);
-            if (isSelected) {
-                item.setBackgroundColor(0x22BB86FC);
-            } else if (isCurrent) {
-                item.setBackgroundColor(getResources().getColor(R.color.colorPrimaryDark));
-            } else {
-                item.setBackgroundColor(getResources().getColor(R.color.surface_elevated));
-            }
+            item.setBackgroundColor(getResources().getColor(
+                    i == currentIndex ? R.color.colorPrimaryDark : R.color.surface_elevated));
             item.setClickable(true);
             item.setFocusable(true);
-            item.setOnClickListener(v -> {
-                if (isSelectMode) {
-                    toggleSelection(index);
-                } else {
-                    playIndex(index);
-                }
-            });
-            item.setOnLongClickListener(v -> {
-                if (!isSelectMode) {
-                    enterSelectMode(index);
-                    return true;
-                }
-                return false;
-            });
+            item.setOnClickListener(v -> playIndex(index));
 
             TextView title = new TextView(this);
-            String prefix = isCurrent && !isSelectMode ? "▶ " : (page.page + ". ");
+            String prefix = i == currentIndex ? "▶ " : (page.page + ". ");
             title.setText(prefix + (TextUtils.isEmpty(page.part) ? page.videoTitle : page.part));
-            title.setTextColor(isSelected ? 0xFFBB86FC : getResources().getColor(R.color.text_primary));
+            title.setTextColor(getResources().getColor(R.color.text_primary));
             title.setTextSize(14);
             title.setSingleLine(true);
             title.setEllipsize(TextUtils.TruncateAt.END);
@@ -312,159 +203,6 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
             listContainer.addView(item);
         }
     }
-
-    // ======================== Multi-Select ========================
-
-    private void enterSelectMode(int initialPosition) {
-        isSelectMode = true;
-        selectedPositions.clear();
-        selectedPositions.add(initialPosition);
-        selectBar.setVisibility(View.VISIBLE);
-        updateSelectBar();
-        renderPageList();
-    }
-
-    private void exitSelectMode() {
-        isSelectMode = false;
-        selectedPositions.clear();
-        selectBar.setVisibility(View.GONE);
-        renderPageList();
-    }
-
-    private void toggleSelection(int position) {
-        if (selectedPositions.contains(position)) {
-            selectedPositions.remove(position);
-        } else {
-            selectedPositions.add(position);
-        }
-        if (selectedPositions.isEmpty()) {
-            exitSelectMode();
-            return;
-        }
-        updateSelectBar();
-        // Update just the affected item's appearance
-        updateItemAppearance(position);
-    }
-
-    private void toggleSelectAll() {
-        if (selectedPositions.size() == fetchedPages.size()) {
-            selectedPositions.clear();
-        } else {
-            for (int i = 0; i < fetchedPages.size(); i++) {
-                selectedPositions.add(i);
-            }
-        }
-        if (selectedPositions.isEmpty()) {
-            exitSelectMode();
-            return;
-        }
-        updateSelectBar();
-        renderPageList();
-    }
-
-    private void updateSelectBar() {
-        if (selectBar.getChildCount() >= 2) {
-            TextView tvDownload = (TextView) selectBar.getChildAt(1);
-            tvDownload.setText("下载(" + selectedPositions.size() + ")");
-        }
-    }
-
-    private void updateItemAppearance(int position) {
-        if (position < 0 || position >= listContainer.getChildCount()) return;
-        View child = listContainer.getChildAt(position);
-        if (child instanceof LinearLayout) {
-            boolean isSelected = selectedPositions.contains(position);
-            child.setBackgroundColor(isSelected ? 0x22BB86FC :
-                    getResources().getColor(R.color.surface_elevated));
-            if (((LinearLayout) child).getChildCount() > 0) {
-                TextView tv = (TextView) ((LinearLayout) child).getChildAt(0);
-                tv.setTextColor(isSelected ? 0xFFBB86FC : getResources().getColor(R.color.text_primary));
-            }
-        }
-    }
-
-    private void downloadSelected() {
-        if (selectedPositions.isEmpty()) return;
-        List<Song> songs = new ArrayList<>();
-        for (Integer pos : selectedPositions) {
-            if (pos >= 0 && pos < fetchedPages.size()) {
-                songs.add(buildSongFromPage(fetchedPages.get(pos)));
-            }
-        }
-        exitSelectMode();
-        String cookie = getSharedPreferences("music163_settings", MODE_PRIVATE)
-                .getString("bilibili_cookie", "");
-        tvSubtitle.setText("正在下载 " + songs.size() + " 首...");
-        DownloadManager.batchDownloadSongs(songs, cookie,
-                new DownloadManager.BatchDownloadCallback() {
-                    @Override
-                    public void onProgress(int current, int total, String songName) {
-                        tvSubtitle.setText("下载中 " + current + "/" + total + ": " + songName);
-                    }
-
-                    @Override
-                    public void onAllComplete(int successCount, int skipCount, int failCount) {
-                        tvSubtitle.setText("下载完成: 成功" + successCount + " 跳过" + skipCount + " 失败" + failCount);
-                        isBatchDownloading = false;
-                        if (btnDownloadAll != null) {
-                            btnDownloadAll.setColorFilter(0x80FFFFFF);
-                        }
-                        renderPageList();
-                    }
-
-                    @Override
-                    public void onSingleError(String songName, String message) {
-                        // Progress shows in onProgress
-                    }
-                });
-    }
-
-    private void startBatchDownloadAll() {
-        if (fetchedPages.isEmpty()) {
-            Toast.makeText(this, "列表为空", Toast.LENGTH_SHORT).show();
-            return;
-        }
-        if (isBatchDownloading) {
-            DownloadManager.cancelBatchDownload();
-            isBatchDownloading = false;
-            if (btnDownloadAll != null) {
-                btnDownloadAll.setColorFilter(0x80FFFFFF);
-            }
-            tvSubtitle.setText("已取消下载");
-            return;
-        }
-        isBatchDownloading = true;
-        if (btnDownloadAll != null) {
-            btnDownloadAll.setColorFilter(0xFFFF4081);
-        }
-        String cookie = getSharedPreferences("music163_settings", MODE_PRIVATE)
-                .getString("bilibili_cookie", "");
-        List<Song> songs = buildSongsFromPages(fetchedPages);
-        tvSubtitle.setText("正在下载 " + songs.size() + " 首...");
-        DownloadManager.batchDownloadSongs(songs, cookie,
-                new DownloadManager.BatchDownloadCallback() {
-                    @Override
-                    public void onProgress(int current, int total, String songName) {
-                        tvSubtitle.setText("下载中 " + current + "/" + total + ": " + songName);
-                    }
-
-                    @Override
-                    public void onAllComplete(int successCount, int skipCount, int failCount) {
-                        tvSubtitle.setText("下载完成: 成功" + successCount + " 跳过" + skipCount + " 失败" + failCount);
-                        isBatchDownloading = false;
-                        if (btnDownloadAll != null) {
-                            btnDownloadAll.setColorFilter(0x80FFFFFF);
-                        }
-                        renderPageList();
-                    }
-
-                    @Override
-                    public void onSingleError(String songName, String message) {
-                    }
-                });
-    }
-
-    // ======================== Playback ========================
 
     private int findCurrentIndexInPlayer() {
         Song currentSong = MusicPlayerManager.getInstance().getCurrentSong();
@@ -521,26 +259,20 @@ public class BilibiliPlaylistActivity extends BaseWatchActivity {
         return true;
     }
 
-    // ======================== Helpers ========================
-
     private List<Song> buildSongsFromPages(List<BilibiliApiHelper.BilibiliPage> pages) {
         List<Song> songs = new ArrayList<>();
         for (BilibiliApiHelper.BilibiliPage page : pages) {
-            songs.add(buildSongFromPage(page));
+            Song song = new Song();
+            song.setId(buildBilibiliSongId(page.bvid, page.cid));
+            song.setName(TextUtils.isEmpty(page.part) ? page.videoTitle : page.part);
+            song.setArtist(page.ownerName);
+            song.setAlbum(page.videoTitle);
+            song.setSource("bilibili");
+            song.setBvid(page.bvid);
+            song.setCid(page.cid);
+            songs.add(song);
         }
         return songs;
-    }
-
-    private Song buildSongFromPage(BilibiliApiHelper.BilibiliPage page) {
-        Song song = new Song();
-        song.setId(buildBilibiliSongId(page.bvid, page.cid));
-        song.setName(TextUtils.isEmpty(page.part) ? page.videoTitle : page.part);
-        song.setArtist(page.ownerName);
-        song.setAlbum(page.videoTitle);
-        song.setSource("bilibili");
-        song.setBvid(page.bvid);
-        song.setCid(page.cid);
-        return song;
     }
 
     private void finishToPlayer() {

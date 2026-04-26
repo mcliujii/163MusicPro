@@ -1,13 +1,11 @@
 package com.qinghe.music163pro.activity;
 
-import android.content.Context;
 import android.os.Bundle;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
 import com.google.android.material.button.MaterialButton;
-import com.qinghe.music163pro.MusicApp;
 import com.qinghe.music163pro.R;
 import com.qinghe.music163pro.util.WatchUiUtils;
 
@@ -15,11 +13,6 @@ import com.qinghe.music163pro.util.WatchUiUtils;
  * Base activity for shared watch UI behavior.
  */
 public abstract class BaseWatchActivity extends AppCompatActivity {
-
-    @Override
-    protected void attachBaseContext(Context newBase) {
-        super.attachBaseContext(MusicApp.wrapWithDpiScale(newBase));
-    }
 
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
